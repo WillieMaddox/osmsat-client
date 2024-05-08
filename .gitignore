@@ -1,0 +1,8 @@
+/node_modules/
+/dist/
+bundle.js
+stats.json
+*.iml
+.idea
+.env.development
+.env.production

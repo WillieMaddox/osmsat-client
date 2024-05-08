@@ -1,0 +1,167 @@
+html, body {
+    margin: 0;
+    height: 100%;
+}
+#map {
+    position: absolute;
+    margin:0;
+    padding:0;
+    overflow:hidden;
+
+    top: 0;
+    /*top: 55px;*/
+    /*left: 20px;*/
+    /*right: 20px;*/
+    bottom:50px;
+    /*bottom: 0;*/
+    width: 100%;
+    background: rgb(229, 227, 223);
+}
+#panel {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt;
+
+    display: flex;
+    position: absolute;
+    bottom:10px;
+    left:10px;
+    right:10px;
+    height:20px;
+    padding:5px;
+
+    border: 1px solid #eee;
+}
+#formatted input {
+  width:550px;
+  margin-left: 10px;
+}
+#LeftLayerLabel {
+    position: absolute;
+    top: 6em;
+    left: 0.5em;
+    font-family: "Arial";
+    font-size: 12pt;
+    z-index: 30;
+}
+#RightLayerLabel {
+    position: absolute;
+    top: 6em;
+    right: 0.5em;
+    font-family: "Arial";
+    font-size: 12pt;
+    z-index: 30;
+}
+#ZoomElement {
+    position: absolute;
+    top: auto;
+    left: 10px;
+    font-family: "Arial";
+    font-size: 12pt;
+    text-shadow: 0 0 0.5em #FFE, 0 0 0.5em #FFE, 0 0 0.5em #FFE;
+    z-index: 30;
+    bottom: 2.0em;
+    /*text-decoration: none;*/
+}
+.ol-custom-mouse-position {
+    position: absolute;
+    top: auto;
+    left: 10px;
+    font-family: "Arial";
+    font-size: 12pt;
+    text-shadow: 0 0 0.7em #FFF, 0 0 0.7em #FFF, 0 0 0.7em #FFF;
+}
+.ol-custom-mouse-positionHDMS {
+    bottom: 11.5em;
+}
+.ol-custom-mouse-position4326 {
+    bottom: 9.5em;
+}
+.ol-custom-mouse-position900913 {
+    bottom: 7.5em;
+}
+.ol-custom-mouse-positionPIXEL {
+    bottom: 5.5em;
+}
+.ol-custom-mouse-positionTILE {
+    bottom: 3.5em;
+}
+.ol-control.ol-layerswitcher {
+    top: 8em;
+}
+.ol-control.ol-layerswitcher.layerSwitcherLeft {
+    left: 0.5em;
+    right: auto;
+}
+.layerSwitcherLeft > button {
+    float: none;
+}
+.hideOpacity .layerswitcher-opacity {
+    display:none;
+}
+.hideOpacity .ol-layerswitcher .layerup {
+    height: 1.5em;
+}
+.ol-control.ol-swipe {
+    top: 4em;
+}
+.ol-swipe:before {
+    width: 0px;
+}
+.ol-button.ol-active button {
+    background: rgba(60, 136, 0, 0.7)
+}
+.debug-toggle {
+    top: 0.5em;
+    left: 9em;
+}
+.bbox-toggle {
+    top: 0.5em;
+    left: 11em;
+}
+.ol-search {
+    left: 13em;
+}
+.ol-search ul {
+    color: #333;
+    font-size:0.85em;
+    max-width: 21em;
+}
+.ol-search ul i {
+    display: block;
+    color: #333;
+    font-size:0.85em;
+}
+.info {
+    display: inline-block;
+    width: 100%;
+}
+.info a img {
+    height: 100px;
+    margin-right: .5em;
+    float: left;
+}
+.ol-button i {
+    color: inherit;
+}
+.ol-button.red button,
+.ol-button.green button,
+.ol-button.blue button {
+    color: #f00;
+    background-color: currentColor;
+    border: 2px solid currentColor;
+    width: 1em;
+    height: 1em;
+    border-radius: 0;
+}
+.ol-button.green button {
+    color: #0f0;
+}
+.ol-button.blue button {
+    color: #00f;
+}
+.ol-button.red button:hover,
+.ol-button.green button:hover,
+.ol-button.blue button:hover {
+    background-color: currentColor!important;
+    border-color: #000;
+}

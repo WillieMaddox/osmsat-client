@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>OSMSAT viewer built on OpenLayers</title>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!--    <link rel="stylesheet" href="node_modules/ol/ol.css" />-->
+<!--    <link rel="stylesheet" href="node_modules/ol-ext/dist/ol-ext.css" />-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="panel">
+      <div id="formatted">
+        <input class="field-CSV" type="text" id="bbox" readonly>
+      </div>
+      &nbsp;&nbsp;&nbsp;&nbsp;
+      <div id="measure">
+        <label for="type">Measurement type &nbsp;</label>
+        <select id="type" disabled>
+          <option value="LineString">Length (LineString)</option>
+          <option value="Polygon">Area (Polygon)</option>
+        </select>
+        &nbsp;&nbsp;&nbsp;&nbsp;
+        <label for="segments">Show segment lengths:&nbsp;</label>
+        <input type="checkbox" id="segments" checked disabled/>
+        &nbsp;&nbsp;&nbsp;&nbsp;
+        <label for="clear">Clear previous measure:&nbsp;</label>
+        <input type="checkbox" id="clear" checked disabled/>
+      </div>
+<!--      <div style="background:white; padding:0 0.45em;"><span id="info"></span>&nbsp;</div>-->
+    </div>
+  </body>
+</html>
