@@ -226,8 +226,9 @@ body {
     width: 0px;
 }
 
-.ol-button.ol-active button {
-    background: rgba(60, 136, 0, 0.7)
+.ol-search.ol-revers button.ol-revers {
+    background-color: #00AAFF;
+    color: #FFF;
 }
 
 .debug-toggle {
@@ -242,6 +243,11 @@ body {
 
 .ol-search {
     left: 13.5rem;
+}
+
+.ol-search input {
+    margin-bottom: 0.2em;
+    height: 1.5em;
 }
 
 .ol-search ul {

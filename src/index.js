@@ -30,7 +30,7 @@ import { style, labelStyle, tipStyle, modifyStyle, imageCord2WorldCords } from '
 import * as tf from '@tensorflow/tfjs';
 
 
-let zoom = 19, center = [-110.83, 32.155];
+let zoom = 16, center = [-110.83, 32.155];
 function coordinateFormatPIXEL(coord) {
     let zoom = view.getZoom()
     let xypixel = meter2pixel(coord[0], coord[1], zoom)
@@ -779,12 +779,6 @@ document.addEventListener('keydown', function (event) {
     } else if (event.key === 'b') {
         let bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
         bboxElement.click();
-    }
-    else if (event.key === 't') {
-        let targetElement = document.querySelectorAll('button[type=button][title="click on the map"]')[0];
-        let searchElement = document.querySelector('.ol-search button[title="Search"]');
-        searchElement.click();
-        targetElement.click();
     }
 });
 
