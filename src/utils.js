@@ -177,4 +177,24 @@ const formatArea = function (polygon) {
     return output;
 };
 
+export function imageCord2WorldCords(img_x, img_y, tile_x, tile_y, zoom) {
+    // img_x is 0 to 1 of the tile size
+    // img_y is 0 to 1 of the tile size
+    // tile_x is the x index of the tile
+    // tile_y is the y index of the tile
+    // zoom is the zoom level
+    function getTileCoords(tileX, tileY, zoom) {
+        const n = Math.pow(2, zoom);
+        const lon_deg = tileX / n * 360.0 - 180.0;
+        const lat_rad = Math.atan(Math.sinh(Math.PI * (1 - 2 * tileY / n)));
+        const lat_deg = lat_rad * (180.0 / Math.PI);
+        return { lat: lat_deg, lon: lon_deg };
+    }
+    const startingCoords = getTileCoords(tile_x, tile_y, zoom);
+    const n = Math.pow(2, zoom);
+    const lon_deg = startingCoords.lon + img_x / n * 360.0;
+    const lat_deg = startingCoords.lat + img_y / n * 180.0;
+    return [lat_deg, lon_deg];
+}
+
 export { style, labelStyle, tipStyle, modifyStyle, toRad, toInt, mod, randomHexColor, convertHex, randomColor, deg2tile, meter2pixel, meter2tile, formatLength, formatArea };

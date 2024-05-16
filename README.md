@@ -15,3 +15,7 @@ Open `index.html` to see the result.
 
     open index.html
     
+For Yolo Model (tfjs pure js version must get model from url so we must run a server to serve the model)
+
+    cd best_web_model
+    http-server -c1 --cors .

@@ -89,8 +89,8 @@ body {
     position: relative;
 }
 
-.CopyIcon.svg{
-    top:1px;    
+.CopyIcon.svg {
+    top: 1px;
 }
 
 .field-CSV {
@@ -100,6 +100,20 @@ body {
 }
 
 /* Open Layer Mods */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(359deg);
+    }
+}
+
+#star {
+    animation: spin 2s linear infinite;
+
+}
 
 .ol-control.ol-search>button:before {
     border: 0;
@@ -132,7 +146,7 @@ body {
 }
 
 .ol-control.ol-bar {
-    left: 8%;
+    left: 6.5rem;
     background-color: transparent;
 }
 
@@ -227,7 +241,7 @@ body {
 }
 
 .ol-search {
-    left: 15%;
+    left: 13.5rem;
 }
 
 .ol-search ul {

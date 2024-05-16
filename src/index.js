@@ -26,12 +26,11 @@ import Swipe from 'ol-ext/control/Swipe';
 import Bar from 'ol-ext/control/Bar';
 
 import { randomColor, meter2pixel, meter2tile, formatLength, formatArea } from './utils';
-import { style, labelStyle, tipStyle, modifyStyle } from './utils';
+import { style, labelStyle, tipStyle, modifyStyle, imageCord2WorldCords } from './utils';
 import * as tf from '@tensorflow/tfjs';
-import labels from "./labels.json";
-const numClass = labels.length;
 
-let zoom = 16, center = [-110.83, 32.155];
+
+let zoom = 19, center = [-110.83, 32.155];
 function coordinateFormatPIXEL(coord) {
     let zoom = view.getZoom()
     let xypixel = meter2pixel(coord[0], coord[1], zoom)
@@ -321,7 +320,7 @@ $RightLayerLabelDiv.style.padding = '0.1rem'
 $RightLayerLabelDiv.style.paddingLeft = '0.5rem'
 document.getElementsByClassName('ol-viewport')[0].appendChild($RightLayerLabelDiv)
 
-let swipe = new Swipe()
+let swipe = new Swipe();
 
 function switchleft(layer) {
     let add_layers = [];
@@ -433,84 +432,6 @@ let debugLayerToggle = new Toggle({
     onToggle: function (active) { debugLayer.setVisible(active) }
 });
 mainbar.addControl(debugLayerToggle);
-
-// Add control to toggle the debug layer.
-function downloadTileImages() {
-    const resources = performance.getEntriesByType('resource');
-    const imageResources = resources.filter(resource => resource.initiatorType === 'img');
-    const imagePaths = imageResources.map(resource => resource.name);
-    let googlePaths = imagePaths.filter(path => path.includes('google'));
-    let googleTiles = googlePaths.filter(path => path.includes('19') || path.includes('20'));
-    console.log(googleTiles);
-
-    googleTiles.slice(0, 5).forEach(async (tile) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.src = tile;
-        img.onload = async function () {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-
-            const imageData = ctx.getImageData(0, 0, img.width, img.height);
-            const tensor = tf.browser.fromPixels(imageData, 3);
-
-            // convert image to batch of 1 image with size 640x640 and 0 to 1 values
-            const reshapedTensor = tensor.reshape([1, img.height, img.width, 3]);
-            const resizedTensor = tf.image.resizeNearestNeighbor(reshapedTensor, [640, 640]);
-            const normalizedTensor = resizedTensor.div(tf.scalar(255));
-
-            // run model
-            const results = model.predict(normalizedTensor); // inference model
-            const transRes = results.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
-            const boxes = tf.tidy(() => {
-                const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
-                const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
-                const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
-                const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
-                return tf
-                    .concat(
-                        [
-                            y1,
-                            x1,
-                            tf.add(y1, h), //y2
-                            tf.add(x1, w), //x2
-                        ],
-                        2
-                    )
-                    .squeeze();
-            }); // process boxes [y1, x1, y2, x2]
-
-            const [scores, classes] = tf.tidy(() => {
-                // class scores
-                const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
-                return [rawScores.max(1), rawScores.argMax(1)];
-            }); // get max scores and classes index
-
-            const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2); // NMS to filter boxes
-
-            const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
-            const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
-            const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
-
-            console.log(boxes_data, scores_data, classes_data);
-
-            tf.dispose([tensor, reshapedTensor, resizedTensor, normalizedTensor]);
-        }
-    });
-
-}
-
-let predictButton = new Toggle({
-    title: "Predict",
-    className: "predict-button",
-    html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
-    active: false,
-    onToggle: function (active) { downloadTileImages() }
-});
-mainbar.addControl(predictButton);
 
 // Interactions
 // TODO: Add ability to drop in shapefiles.
@@ -795,9 +716,58 @@ showSegments.onchange = function () {
     measureDraw.getOverlay().changed();
 };
 
+
+
+// yolo predict code
+// Add control to toggle the debug layer.
+function downloadTileImages() {
+    const resources = performance.getEntriesByType('resource');
+    const imageResources = resources.filter(resource => resource.initiatorType === 'img');
+    const imagePaths = imageResources.map(resource => resource.name);
+    let googlePaths = imagePaths.filter(path => path.includes('google'));
+    let googleTiles = googlePaths.filter(path => path.includes('19') || path.includes('20'));
+
+    googleTiles.slice(0, 1).forEach(async (tile) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = tile;
+        img.onload = async function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            // convert image to batch of 1 image with size 640x640 and 0 to 1 values
+            const imageData = ctx.getImageData(0, 0, img.width, img.height);
+            const tensor = tf.browser.fromPixels(imageData, 3);
+            const reshapedTensor = tensor.reshape([1, img.height, img.width, 3]);
+            const resizedTensor = tf.image.resizeNearestNeighbor(reshapedTensor, [640, 640]);
+            const normalizedTensor = resizedTensor.div(tf.scalar(255));
+
+            // run model
+            const results = model.predict(normalizedTensor); // inference model
+
+            // convert [1, 94, 8400] into the OBB results 89 classes + 5 bounding box values
+            console.log(results);
+
+            tf.dispose([tensor, reshapedTensor, resizedTensor, normalizedTensor]);
+        }
+    });
+}
+
+let predictButton = new Toggle({
+    title: "Predict",
+    className: "predict-button",
+    html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
+    active: false,
+    onToggle: function (active) { downloadTileImages() }
+});
+mainbar.addControl(predictButton);
+
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
 document.addEventListener('keydown', function (event) {
-    if (event.key === 'g') {
+    if (event.key === 'd') {
         let debugElement = document.querySelectorAll('button[type=button][title="Tiling Grid"]')[0];
         debugElement.click();
     } else if (event.key === 'p') {
@@ -809,6 +779,12 @@ document.addEventListener('keydown', function (event) {
     } else if (event.key === 'b') {
         let bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
         bboxElement.click();
+    }
+    else if (event.key === 't') {
+        let targetElement = document.querySelectorAll('button[type=button][title="click on the map"]')[0];
+        let searchElement = document.querySelector('.ol-search button[title="Search"]');
+        searchElement.click();
+        targetElement.click();
     }
 });
 
@@ -847,7 +823,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Show loading spinner
     let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
-    predictElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+    predictElement.innerHTML = '<svg id="star" width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
 
     model = await tf.loadGraphModel(MODEL_URL);
     const dummyInput = tf.ones(model.inputs[0].shape);
