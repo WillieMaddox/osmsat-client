@@ -1,0 +1,102 @@
+description: Ultralytics YOLOv8s-obb model trained on allplanes.yaml
+author: Ultralytics
+date: '2024-04-23T20:20:18.295676'
+version: 8.2.2
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: obb
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: A10
+  1: A20N
+  2: A21N
+  3: A306
+  4: A319
+  5: A320
+  6: A321
+  7: A332
+  8: A333
+  9: A359
+  10: AN2
+  11: B1
+  12: B37M
+  13: B38M
+  14: B39M
+  15: B52
+  16: B712
+  17: B737W
+  18: B738W
+  19: B744
+  20: B752
+  21: B752W
+  22: B763
+  23: B763F
+  24: B772
+  25: B77L
+  26: B77W
+  27: B788
+  28: B789
+  29: BE40
+  30: C130
+  31: C13J
+  32: C17
+  33: C208B
+  34: C5
+  35: CJ6
+  36: CRJ2
+  37: CRJ7
+  38: CRJ9
+  39: DH8D
+  40: E145
+  41: E170
+  42: E190
+  43: E3TF
+  44: E45X
+  45: E75L
+  46: E75S
+  47: F15
+  48: F16
+  49: F18H
+  50: F18S
+  51: F35
+  52: H6
+  53: IL76
+  54: J10
+  55: J11
+  56: J6
+  57: J7
+  58: J8B
+  59: JH7
+  60: JL10
+  61: JL8
+  62: JL9
+  63: K35R
+  64: KC46
+  65: MD11
+  66: MD80
+  67: MG21
+  68: MG29
+  69: MG31
+  70: P3
+  71: P8
+  72: Q5
+  73: SU24
+  74: SU25
+  75: SU27
+  76: SU33
+  77: SU34
+  78: T134
+  79: T22M
+  80: T38
+  81: TEX2
+  82: TU95
+  83: V22
+  84: Y12
+  85: Y20
+  86: Y5
+  87: Y7
+  88: Y8

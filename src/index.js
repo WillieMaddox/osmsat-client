@@ -1,127 +1,55 @@
-// import 'ol-ext/control/Bar.css';
-// import 'ol-ext/control/EditBar.css';
-// import 'ol-ext/control/Swipe.css';
-// import 'ol-ext/control/Search.css';
-// import 'ol-ext/control/LayerSwitcher.css';
+// must import css in this order
 import 'ol/ol.css';
 import 'ol-ext/dist/ol-ext.css'
 import './style.css';
-// import $ from 'jquery';
-import Map from 'ol/Map';
-import View from 'ol/View';
-import { transform } from 'ol/proj';
-import { getCenter } from 'ol/extent';
-import { LineString, Point } from 'ol/geom';
-import { getArea, getLength } from 'ol/sphere';
-// import { createXYZ } from 'ol/tilegrid';
-import { ATTRIBUTION } from 'ol/source/OSM'
-import { Fill, Stroke, Style, Text, RegularShape, Circle as CircleStyle} from 'ol/style';
-import { createStringXY, toStringHDMS } from 'ol/coordinate';
-import { GeoJSON, TopoJSON, MVT, GPX, IGC, KML, WKB } from 'ol/format';
-import { Attribution, MousePosition, ScaleLine } from 'ol/control';
-import { Select, Draw, Modify, DragAndDrop, Snap, defaults as defaultInteractions } from 'ol/interaction';
 
-// import VectorTileSource from 'ol/source/VectorTile';
-import { Vector as VectorSource, XYZ } from 'ol/source';
-import { TileDebug, OSM, BingMaps, StadiaMaps, GeoTIFF } from 'ol/source';
+import { Select, Draw, Modify, DragAndDrop, defaults as defaultInteractions } from 'ol/interaction';
+import { Fill, Stroke, Style, Text, RegularShape, Circle as CircleStyle } from 'ol/style';
+import { Vector as VectorSource, XYZ, TileDebug, OSM, BingMaps } from 'ol/source';
 import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer';
+import { Attribution, MousePosition, ScaleLine } from 'ol/control';
+import { GeoJSON, TopoJSON, GPX, IGC, KML, WKB } from 'ol/format';
+import { createStringXY, toStringHDMS } from 'ol/coordinate';
+import { LineString, Point } from 'ol/geom';
+import { ATTRIBUTION } from 'ol/source/OSM'
 import LayerGroup from 'ol/layer/Group';
-// import { WebGLTile } from "ol/layer";
-// import VectorTileLayer from 'ol/layer/VectorTile';
-// import MapboxVectorLayer from 'ol/layer/MapboxVector';
-// import { MapboxVectorLayer } from 'ol-mapbox-style';
-// import ol_ext_element from 'ol-ext/util/element';
-import Bar from 'ol-ext/control/Bar';
-import Swipe from 'ol-ext/control/Swipe';
-import Toggle from 'ol-ext/control/Toggle';
-// import Button from 'ol-ext/control/Button';
-// import EditBar from 'ol-ext/control/EditBar';
-// import UndoRedo from "ol-ext/interaction/UndoRedo";
-import DrawRegular from "ol-ext/interaction/DrawRegular";
-// import FillAttribute from "ol-ext/interaction/FillAttribute";
-import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
-import SearchNominatim from 'ol-ext/control/SearchNominatim';
+import { getCenter } from 'ol/extent';
+import { transform } from 'ol/proj';
+import View from 'ol/View';
+import Map from 'ol/Map';
 
-const style = new Style({
-    fill: new Fill({
-        color: 'rgba(255, 255, 255, 0.2)',
-    }),
-    stroke: new Stroke({
-        color: 'rgba(0, 0, 0, 0.5)',
-        lineDash: [10, 10],
-        width: 2,
-    }),
-    image: new CircleStyle({
-        radius: 5,
-        stroke: new Stroke({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 0.2)',
-        }),
-    }),
-});
-const labelStyle = new Style({
-    text: new Text({
-        font: '14px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
-        padding: [3, 3, 3, 3],
-        textBaseline: 'bottom',
-        offsetY: -15,
-    }),
-    image: new RegularShape({
-        radius: 8,
-        points: 3,
-        angle: Math.PI,
-        displacement: [0, 10],
-        fill: new Fill({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
-    }),
-});
-const tipStyle = new Style({
-    text: new Text({
-        font: '12px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
-        padding: [2, 2, 2, 2],
-        textAlign: 'left',
-        offsetX: 15,
-    }),
-});
-const modifyStyle = new Style({
-    image: new CircleStyle({
-        radius: 5,
-        stroke: new Stroke({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
-        fill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
-    }),
-    text: new Text({
-        text: 'Drag to modify',
-        font: '12px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
-        padding: [2, 2, 2, 2],
-        textAlign: 'left',
-        offsetX: 15,
-    }),
-});
+import SearchNominatim from 'ol-ext/control/SearchNominatim';
+import DrawRegular from "ol-ext/interaction/DrawRegular";
+import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
+import Toggle from 'ol-ext/control/Toggle';
+import Swipe from 'ol-ext/control/Swipe';
+import Bar from 'ol-ext/control/Bar';
+
+import { randomColor, meter2pixel, meter2tile, formatLength, formatArea } from './utils';
+import { style, labelStyle, tipStyle, modifyStyle } from './utils';
+import * as tf from '@tensorflow/tfjs';
+import labels from "./labels.json";
+const numClass = labels.length;
+
+let zoom = 16, center = [-110.83, 32.155];
+function coordinateFormatPIXEL(coord) {
+    let zoom = view.getZoom()
+    let xypixel = meter2pixel(coord[0], coord[1], zoom)
+    let x = 'X: ' + xypixel[0]
+    let y = 'Y: ' + xypixel[1]
+    return [x, y].join('   ')
+}
+function coordinateFormatTILE(coord) {
+    let zoom = view.getZoom()
+    let xytile = meter2tile(coord[0], coord[1], zoom)
+    let x = 'X: ' + xytile[0]
+    let y = 'Y: ' + xytile[1]
+    let z = 'Z: ' + xytile[2]
+    let c = 'C: ' + xytile[3]
+    let r = 'R: ' + xytile[4]
+    return [z, x, y, c, r].join('   ')
+}
+
 const segmentStyle = new Style({
     text: new Text({
         font: '12px Calibri,sans-serif',
@@ -147,203 +75,13 @@ const segmentStyle = new Style({
 });
 const segmentStyles = [segmentStyle];
 
-function toRad (x) {
-    return x * Math.PI / 180.0
-}
-function toInt (x) {
-    return ~~x
-}
-function mod (n, m) {
-    return ((n % m) + m) % m
-}
-function randomHexColor () {
-    const num = Math.floor(Math.random() * 16777215).toString(16)
-    return '#' + String.prototype.repeat.call('0', 6 - num.length) + num
-}
-function convertHex (hex, opacity) {
-    let rgb;
-    hex = hex.replace('#', '');
-    const idx = toInt(Math.floor(Math.random() * 3))
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    if (opacity) {
-        rgb = [r, g, b, opacity]
-    } else {
-        rgb = [r, g, b]
-    }
-    rgb[idx] = 255
-    return rgb
-}
-function randomColor (opacity) {
-    const idx = toInt(Math.floor(Math.random() * 3));
-    const r = idx === 0 ? 255 : toInt(Math.floor(Math.random() * 256));
-    const g = idx === 1 ? 255 : toInt(Math.floor(Math.random() * 256));
-    const b = idx === 2 ? 255 : toInt(Math.floor(Math.random() * 256));
-    if (opacity) {
-        return [r, g, b, opacity]
-    } else {
-        return [r, g, b]
-    }
-}
-function deg2tile (lon_deg, lat_deg, zoom) {
-    const lat_rad = toRad(lat_deg)
-    const ztile = Math.round(zoom)
-    const n = Math.pow(2, ztile)
-    const xtile = toInt(mod((lon_deg + 180.0) / 360.0, 1) * n)
-    const ytile = toInt((1.0 - Math.log(Math.tan(lat_rad) + (1 / Math.cos(lat_rad))) / Math.PI) / 2.0 * n)
-    return [xtile, ytile, ztile]
-}
-function meter2pixel (mx, my, zoom) {
-    let ires = 2 * Math.PI * 6378137 / 256
-    let oshift = 2 * Math.PI * 6378137 / 2.0
-    let ztile = Math.round(zoom)
-    let res = ires / Math.pow(2, ztile)
-    let xpixel = toInt((mx + oshift) / res)
-    let ypixel = toInt((my + oshift) / res)
-    let mapsize = 256 << ztile
-    ypixel = mapsize - ypixel
-    return [xpixel, ypixel]
-}
-function meter2tile (mx, my, zoom) {
-    let ires = 2 * Math.PI * 6378137 / 256
-    let oshift = 2 * Math.PI * 6378137 / 2.0
-    let ztile = Math.round(zoom)
-    let res = ires / Math.pow(2, ztile)
-    let xpixel = toInt((mx + oshift) / res)
-    let ypixel = toInt((my + oshift) / res)
-    let mapsize = 256 << ztile
-    ypixel = mapsize - ypixel
-    let xtile = toInt(xpixel / 256)
-    let ytile = toInt(ypixel / 256)
-    let xcol = mod(xpixel, 256)
-    let yrow = mod(ypixel, 256)
-    return [xtile, ytile, ztile, xcol, yrow]
-}
-function coordinateFormatPIXEL (coord) {
-    let zoom = view.getZoom()
-    let xypixel = meter2pixel(coord[0], coord[1], zoom)
-    let x = 'X: ' + xypixel[0]
-    let y = 'Y: ' + xypixel[1]
-    return [x, y].join('   ')
-}
-function coordinateFormatTILE (coord) {
-    let zoom = view.getZoom()
-    let xytile = meter2tile(coord[0], coord[1], zoom)
-    let x = 'X: ' + xytile[0]
-    let y = 'Y: ' + xytile[1]
-    let z = 'Z: ' + xytile[2]
-    let c = 'C: ' + xytile[3]
-    let r = 'R: ' + xytile[4]
-    return [z, x, y, c, r].join('   ')
-}
-
-const formatLength = function (line) {
-    const length = getLength(line);
-    let output;
-    if (length > 100) {
-        output = Math.round((length / 1000) * 100) / 100 + ' km';
-    } else {
-        output = Math.round(length * 100) / 100 + ' m';
-    }
-    return output;
-};
-const formatArea = function (polygon) {
-    const area = getArea(polygon);
-    let output;
-    if (area > 10000) {
-        output = Math.round((area / 1000000) * 100) / 100 + ' km\xB2';
-    } else {
-        output = Math.round(area * 100) / 100 + ' m\xB2';
-    }
-    return output;
-};
-
-let zoom = 16, center = [-110.83, 32.155];
-
 let thunderforestAttributions = [
     'Tiles &copy; <a href="https://www.thunderforest.com/">Thunderforest</a>',
     ATTRIBUTION
-]
-
-// let bingmapslayer = new TileLayer({
-//     title: 'Bing Aerial',
-//     visible: true,
-//     baseLayer: true,
-//     source: new BingMaps({
-//         key: process.env.BINGMAPS_API_KEY,
-//         imagerySet: 'Aerial',
-//     })
-// });
-
-// TODO: Make these layers work
-// let Mapbox512_localhost = new TileLayer({
-//     title: 'Mapbox512 (on localhost)',
-//     visible: false,
-//     baseLayer: true,
-//     source: new XYZ({
-//         url: '/mnt/Aorus/DATA/geos/maptiles/mapbox/satellite/{z}/{x}/{y}.png',
-//     }),
-// });
-// let tileservergl_osmsat = new TileLayer({
-//     title: 'tileserver-gl (on osmsat)',
-//     visible: false,
-//     baseLayer: true,
-//     source: new XYZ({
-//         url: 'http://osmsat.wbm4.com:8087/styles/basic-preview/{z}/{x}/{y}.png'
-//     })
-// });
-// let OSMvector_localhost = new VectorTileLayer({
-//     title: 'OSMvector (localhost)',
-//     visible: false,
-//     baseLayer: true,
-//     source: new VectorTileSource({
-//         // url: 'http://localhost:8087/tiles/{z}/{x}/{y}.pbf',
-//         url: 'http://localhost:8087/data/v3/{z}/{x}/{y}.pbf',
-//         format: new MVT(),
-//         tileGrid: createXYZ({tileSize: 256, maxZoom: 20}),
-//     })
-// });
-
-// TODO: Test if WebGLTile would work faster for TileLayer.
-// let cog = new GeoTIFF({
-//   sources: [
-//     { url: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/2020/S2A_36QWD_20200701_0_L2A/TCI.tif' }
-//   ]
-// });
-// let gl = new WebGLTile({
-//   // className: 'gl',
-//   source: cog
-// });
-// map.addLayer(gl);
-// map.setView(cog.getView());
-// swipe.addLayer(gl, false);
-
-// const source = new GeoTIFF({
-//     sources: [
-//         {
-//             url: 'iSpy/NL_671721131_21OCT06045117-M1BS-505238142070_04_P001_3bands_scaled_3857_Tcrop.tif',
-//         },
-//     ],
-// });
-// const ras = new TileLayer({
-//     source: source,
-// });
-// map.addLayer(ras);
-// map.setView(source.getView());
-
-// // A layer group for Testing new layers
-// let satlayers = new LayerGroup({
-//     title: 'Test Group',
-//     openInLayerSwitcher: true,
-//     layers: [
-//         bingmapslayer,
-//         newlayer,
-//     ]
-// });
+];
 
 // TODO: Add Attribution for left hand layer.
-function StaticGroup () {
+function StaticGroup() {
     return new LayerGroup({
         layers: [
             new LayerGroup({
@@ -482,65 +220,7 @@ function StaticGroup () {
                             imagerySet: 'Aerial'
                         })
                     }),
-                    // new MapboxVectorLayer({
-                    //     title: 'OSM (Mapbox Vector Layer)',
-                    //     visible: false,
-                    //     baseLayer: true,
-                    //     // styleUrl: 'mapbox://styles/maddoxw/bright-v9',
-                    //     styleUrl: 'mapbox://styles/maddoxw/cl4di271q000514nn9j5omi0c',
-                    //     accessToken: process.env.MAPBOX_API_KEY,
-                    // }),
-                    // new TileLayer({
-                    //     title: 'OpenSeaMap',
-                    //     visible: false,
-                    //     baseLayer: true,
-                    //     source: new OSM({
-                    //         url: 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
-                    //         attributions: [
-                    //             'All maps © <a href="https://www.openseamap.org/">OpenSeaMap</a>',
-                    //             ATTRIBUTION,
-                    //         ],
-                    //         opaque: false,
-                    //     }),
-                    // }),
-                    // new TileLayer({
-                    //     title: "Stamen (Watercolor)",
-                    //     visible: false,
-                    //     baseLayer: true,
-                    //     source: new StadiaMaps({ layer: 'stamen_watercolor' })
-                    // }),
-                    // new TileLayer({
-                    //     title: "Stamen (Labels)",
-                    //     visible: false,
-                    //     baseLayer: true,
-                    //     allwaysOnTop: false,			// Stay on top of layer switcher
-                    //     displayInLayerSwitcher: true,
-                    //     source: new StadiaMaps({ layer: 'stamen_terrain_labels' })
-                    // }),
-                    // new TileLayer({
-                    //     title: "Stamen (Toner)",
-                    //     visible: false,
-                    //     baseLayer: true,
-                    //     source: new StadiaMaps({ layer: 'stamen_toner' })
-                    // }),
-                    // new TileLayer({
-                    //     title: 'osmpgsql + mod_tile',
-                    //     visible: false,
-                    //     baseLayer: true,
-                    //     source: new OSM({
-                    //         url: 'osm_tiles/{z}/{x}/{y}.png',
-                    //         crossOrigin: null,
-                    //     })
-                    // }),
-                    // new TileLayer({
-                    //     title: 'tileserver-gl (localhost)',
-                    //     visible: false,
-                    //     baseLayer: true,
-                    //     source: new XYZ({
-                    //         url: 'http://localhost:8087/styles/basic-preview/{z}/{x}/{y}.png'
-                    //     })
-                    // }),
-                ]//.reverse()
+                ]
             }),
             new LayerGroup({
                 title: 'Vector Layers',
@@ -571,35 +251,35 @@ let controls = [
     new ScaleLine(),
     new MousePosition({
         target: document.getElementById('mouse-position'),
-        coordinateFormat: function(coord) {
+        coordinateFormat: function (coord) {
             return 'HDMS: ' + toStringHDMS(coord);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionHDMS',
         projection: 'EPSG:4326',
     }),
     new MousePosition({
-        coordinateFormat: function(coord) {
+        coordinateFormat: function (coord) {
             return '4326: ' + createStringXY(6)(coord);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-position4326',
         projection: 'EPSG:4326',
     }),
     new MousePosition({
-        coordinateFormat: function(coord) {
+        coordinateFormat: function (coord) {
             return '900913: ' + createStringXY(1)(coord);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-position900913',
         projection: 'EPSG:900913',
     }),
     new MousePosition({
-        coordinateFormat: function(coord) {
+        coordinateFormat: function (coord) {
             return 'PIXEL: ' + coordinateFormatPIXEL(coord);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionPIXEL',
         projection: 'EPSG:900913',
     }),
     new MousePosition({
-        coordinateFormat: function(coord) {
+        coordinateFormat: function (coord) {
             return 'TILE: ' + coordinateFormatTILE(coord);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionTILE',
@@ -624,23 +304,30 @@ let map = new Map({
     maxTilesLoading: 24
 });
 
+// RightLayerLabelDiv LeftLayerLabelDiv
 let $LeftLayerLabelDiv = document.createElement('div')
 $LeftLayerLabelDiv.id = 'LeftLayerLabel'
 $LeftLayerLabelDiv.className = 'ol-unselectable ol-control'
+$LeftLayerLabelDiv.style.backgroundColor = 'rgba(256, 256, 256, 0.75)'
+$LeftLayerLabelDiv.style.padding = '0.1rem'
+$LeftLayerLabelDiv.style.paddingRight = '0.5rem'
 document.getElementsByClassName('ol-viewport')[0].appendChild($LeftLayerLabelDiv)
 
 let $RightLayerLabelDiv = document.createElement('div')
 $RightLayerLabelDiv.id = 'RightLayerLabel'
 $RightLayerLabelDiv.className = 'ol-unselectable ol-control'
+$RightLayerLabelDiv.style.backgroundColor = 'rgba(256, 256, 256, 0.75)'
+$RightLayerLabelDiv.style.padding = '0.1rem'
+$RightLayerLabelDiv.style.paddingLeft = '0.5rem'
 document.getElementsByClassName('ol-viewport')[0].appendChild($RightLayerLabelDiv)
 
 let swipe = new Swipe()
 
-function switchleft (layer) {
+function switchleft(layer) {
     let add_layers = [];
     let del_layers = [];
     if (layer.get('baseLayer')) {
-        swipe.layers.forEach( function(l) {
+        swipe.layers.forEach(function (l) {
             if (!l.right && l.layer.get('baseLayer')) {
                 add_layers.push(layer);
                 del_layers.push(l.layer);
@@ -660,11 +347,11 @@ function switchleft (layer) {
     }
     // console.log(' left ' + layer.get('title') + ' ' + layer.get('baseLayer') + ' ' + layer.get('visible'));
 }
-function switchright (layer) {
+function switchright(layer) {
     let add_layers = [];
     let del_layers = [];
     if (layer.get('baseLayer')) {
-        swipe.layers.forEach( function(l) {
+        swipe.layers.forEach(function (l) {
             if (l.right && l.layer.get('baseLayer')) {
                 add_layers.push(layer);
                 del_layers.push(l.layer);
@@ -707,7 +394,7 @@ let layerswitcheright = new LayerSwitcher({
 });
 map.addControl(layerswitcheright);
 
-function initswipelayer ({layergroup, right, idx = 0} = {}) {
+function initswipelayer({ layergroup, right, idx = 0 } = {}) {
     // let layers = layergroup.getLayers().getArray()
     let layers = layergroup.getLayers().getArray()[0].getLayersArray()
     let index = Math.max(0, layers.length - (1 + idx))
@@ -721,8 +408,8 @@ function initswipelayer ({layergroup, right, idx = 0} = {}) {
     }
     // console.log(layer.get('title') + (right?" right":" left"));
 }
-initswipelayer({layergroup: leftgroup, right: false, idx: 5})
-initswipelayer({layergroup: rightgroup, right: true, idx: 1})
+initswipelayer({ layergroup: leftgroup, right: false, idx: 5 })
+initswipelayer({ layergroup: rightgroup, right: true, idx: 1 })
 map.addControl(swipe);
 
 // Main control bar
@@ -741,15 +428,89 @@ map.addLayer(debugLayer);
 let debugLayerToggle = new Toggle({
     title: "Tiling Grid",
     className: "debug-toggle",
-    html: '<i class="fa">D</i>',
+    html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M12.5 2H8V7H13V2.5C13 2.22386 12.7761 2 12.5 2ZM13 8H8V13H12.5C12.7761 13 13 12.7761 13 12.5V8ZM7 7V2H2.5C2.22386 2 2 2.22386 2 2.5V7H7ZM2 8V12.5C2 12.7761 2.22386 13 2.5 13H7V8H2ZM2.5 1C1.67157 1 1 1.67157 1 2.5V12.5C1 13.3284 1.67157 14 2.5 14H12.5C13.3284 14 14 13.3284 14 12.5V2.5C14 1.67157 13.3284 1 12.5 1H2.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
     active: false,
-    onToggle: function(active) { debugLayer.setVisible(active) }
+    onToggle: function (active) { debugLayer.setVisible(active) }
 });
 mainbar.addControl(debugLayerToggle);
 
-/* Nested toobar with one control activated at once */
-var nestedbar = new Bar ({ toggleOne: true, group:true });
-mainbar.addControl(nestedbar);
+// Add control to toggle the debug layer.
+function downloadTileImages() {
+    const resources = performance.getEntriesByType('resource');
+    const imageResources = resources.filter(resource => resource.initiatorType === 'img');
+    const imagePaths = imageResources.map(resource => resource.name);
+    let googlePaths = imagePaths.filter(path => path.includes('google'));
+    let googleTiles = googlePaths.filter(path => path.includes('19') || path.includes('20'));
+    console.log(googleTiles);
+
+    googleTiles.slice(0, 5).forEach(async (tile) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = tile;
+        img.onload = async function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, img.width, img.height);
+            const tensor = tf.browser.fromPixels(imageData, 3);
+
+            // convert image to batch of 1 image with size 640x640 and 0 to 1 values
+            const reshapedTensor = tensor.reshape([1, img.height, img.width, 3]);
+            const resizedTensor = tf.image.resizeNearestNeighbor(reshapedTensor, [640, 640]);
+            const normalizedTensor = resizedTensor.div(tf.scalar(255));
+
+            // run model
+            const results = model.predict(normalizedTensor); // inference model
+            const transRes = results.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
+            const boxes = tf.tidy(() => {
+                const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
+                const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
+                const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
+                const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
+                return tf
+                    .concat(
+                        [
+                            y1,
+                            x1,
+                            tf.add(y1, h), //y2
+                            tf.add(x1, w), //x2
+                        ],
+                        2
+                    )
+                    .squeeze();
+            }); // process boxes [y1, x1, y2, x2]
+
+            const [scores, classes] = tf.tidy(() => {
+                // class scores
+                const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
+                return [rawScores.max(1), rawScores.argMax(1)];
+            }); // get max scores and classes index
+
+            const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2); // NMS to filter boxes
+
+            const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
+            const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
+            const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
+
+            console.log(boxes_data, scores_data, classes_data);
+
+            tf.dispose([tensor, reshapedTensor, resizedTensor, normalizedTensor]);
+        }
+    });
+
+}
+
+let predictButton = new Toggle({
+    title: "Predict",
+    className: "predict-button",
+    html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
+    active: false,
+    onToggle: function (active) { downloadTileImages() }
+});
+mainbar.addControl(predictButton);
 
 // Interactions
 // TODO: Add ability to drop in shapefiles.
@@ -776,12 +537,12 @@ dragAndDropInteraction.on('addfeatures', function (e) {
     const style = new Style({
         image: new CircleStyle({
             radius: 3,
-            stroke: new Stroke({color: randomColor(), width: 2}),
+            stroke: new Stroke({ color: randomColor(), width: 2 }),
         }),
-        stroke: new Stroke({color: randomColor(), width: 3}),
+        stroke: new Stroke({ color: randomColor(), width: 3 }),
         // stroke: new Stroke({color: 'rgb(255,165,0)', width: 3}),
     })
-    function DragAndDropVectorLayer () {
+    function DragAndDropVectorLayer() {
         return new VectorLayer({
             title: e.file.name,
             visible: true,
@@ -808,11 +569,11 @@ let searchLayer = new VectorLayer({
     style: new Style({
         image: new CircleStyle({
             radius: 5,
-            stroke: new Stroke({color: 'rgb(255,165,0)', width: 3}),
-            fill: new Fill({color: 'rgba(255,165,0,.3)'})
+            stroke: new Stroke({ color: 'rgb(255,165,0)', width: 3 }),
+            fill: new Fill({ color: 'rgba(255,165,0,.3)' })
         }),
-        stroke: new Stroke({color: 'rgb(255,165,0)', width: 3}),
-        fill: new Fill({color: 'rgba(255,165,0,.3)'})
+        stroke: new Stroke({ color: 'rgb(255,165,0)', width: 3 }),
+        fill: new Fill({ color: 'rgba(255,165,0,.3)' })
     })
 });
 map.addLayer(searchLayer);
@@ -823,8 +584,9 @@ let search = new SearchNominatim({
     maxItems: 15
 });
 map.addControl(search);
-search.on('select', function(e) {
-// console.log(e);
+
+search.on('select', function (e) {
+    // console.log(e);
     searchLayer.getSource().clear();
     // Check if we get a geojson to describe the search
     if (e.search.geojson) {
@@ -836,16 +598,16 @@ search.on('select', function(e) {
         let zoom = view.getZoomForResolution(resolution);
         let center = getCenter(f.getGeometry().getExtent());
         // redraw before zoom
-        setTimeout(function(){
+        setTimeout(function () {
             view.animate({
                 center: center,
-                zoom: Math.min (zoom, 16)
+                zoom: Math.min(zoom, 16)
             });
         }, 100);
     } else {
         map.getView().animate({
             center: e.coordinate,
-            zoom: Math.max (map.getView().getZoom(), 16)
+            zoom: Math.max(map.getView().getZoom(), 16)
         });
     }
 });
@@ -855,7 +617,7 @@ let bboxLayer = new VectorLayer({
     name: 'BBox',
     source: new VectorSource(),
     style: new Style({
-        stroke: new Stroke({color: 'rgb(0,76,151)', width: 3}),
+        stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
     }),
     visible: false
 });
@@ -864,7 +626,7 @@ map.addLayer(bboxLayer);
 let bboxToggle = new Toggle({
     title: "Bounding Box",
     className: "bbox-toggle",
-    html: '<i class="fa">B</i>',
+    html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M12.5 2H2.5C2.22386 2 2 2.22386 2 2.5V12.5C2 12.7761 2.22386 13 2.5 13H12.5C12.7761 13 13 12.7761 13 12.5V2.5C13 2.22386 12.7761 2 12.5 2ZM2.5 1C1.67157 1 1 1.67157 1 2.5V12.5C1 13.3284 1.67157 14 2.5 14H12.5C13.3284 14 14 13.3284 14 12.5V2.5C14 1.67157 13.3284 1 12.5 1H2.5Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
     interaction: new Select(),
     active: false,
 });
@@ -873,8 +635,9 @@ bboxToggle.on('change:active', function (e) {
     bboxLayer.getSource().clear();
     bboxInteraction.setActive(e.active);
     bboxLayer.setVisible(e.active);
+    measureDisplayElement.style.display = e.active ? '' : 'none';
 })
-nestedbar.addControl(bboxToggle);
+mainbar.addControl(bboxToggle);
 
 let bboxInteraction = new DrawRegular({
     source: bboxLayer.getSource(),
@@ -893,16 +656,18 @@ bboxInteraction.on('drawing', function (e) {
     lat1 = Math.max(c0[1], c1[1]);
     ll0 = createStringXY(6)([lon0, lat0])
     ll1 = createStringXY(6)([lon1, lat1])
-    document.getElementById('bbox').value = ll0+', '+ll1;
+    document.getElementById('bbox').value = ll0 + ', ' + ll1;
 });
 
 
 const typeSelect = document.getElementById('type');
 const showSegments = document.getElementById('segments');
 const clearPrevious = document.getElementById('clear');
+const measureElement = document.getElementById('measure');
+const measureDisplayElement = document.getElementById('formatted');
 
 const measureSource = new VectorSource();
-const measureModify = new Modify({source: measureSource, style: modifyStyle});
+const measureModify = new Modify({ source: measureSource, style: modifyStyle });
 
 let tipPoint;
 
@@ -967,7 +732,7 @@ map.addLayer(measureLayer)
 let measureToggle = new Toggle({
     title: "Measure",
     className: "measure-toggle",
-    html: '<i class="fa">M</i>',
+    html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M0.5 4C0.223858 4 0 4.22386 0 4.5V10.5C0 10.7761 0.223858 11 0.5 11H14.5C14.7761 11 15 10.7761 15 10.5V4.5C15 4.22386 14.7761 4 14.5 4H0.5ZM1 10V5H2.075V7.5C2.075 7.73472 2.26528 7.925 2.5 7.925C2.73472 7.925 2.925 7.73472 2.925 7.5V5H4.075V6.5C4.075 6.73472 4.26528 6.925 4.5 6.925C4.73472 6.925 4.925 6.73472 4.925 6.5V5H6.075V6.5C6.075 6.73472 6.26528 6.925 6.5 6.925C6.73472 6.925 6.925 6.73472 6.925 6.5V5H8.075V7.5C8.075 7.73472 8.26528 7.925 8.5 7.925C8.73472 7.925 8.925 7.73472 8.925 7.5V5H10.075V6.5C10.075 6.73472 10.2653 6.925 10.5 6.925C10.7347 6.925 10.925 6.73472 10.925 6.5V5H12.075V6.5C12.075 6.73472 12.2653 6.925 12.5 6.925C12.7347 6.925 12.925 6.73472 12.925 6.5V5H14V10H1Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
     active: false,
 });
 measureToggle.on('change:active', function (e) {
@@ -978,8 +743,9 @@ measureToggle.on('change:active', function (e) {
     typeSelect.disabled = !e.active;
     showSegments.disabled = !e.active;
     clearPrevious.disabled = !e.active;
+    measureElement.style.display = e.active ? '' : 'none';
 });
-nestedbar.addControl(measureToggle);
+mainbar.addControl(measureToggle);
 
 map.addInteraction(measureModify);
 
@@ -997,7 +763,7 @@ function addInteraction() {
         type: drawType,
         style: function (feature) {
             return styleFunction(feature, showSegments.checked, drawType, tip);
-            },
+        },
     });
     measureDraw.on('drawstart', function () {
         if (clearPrevious.checked) {
@@ -1028,6 +794,69 @@ showSegments.onchange = function () {
     measureLayer.changed();
     measureDraw.getOverlay().changed();
 };
+
+// create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'g') {
+        let debugElement = document.querySelectorAll('button[type=button][title="Tiling Grid"]')[0];
+        debugElement.click();
+    } else if (event.key === 'p') {
+        let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
+        predictElement.click();
+    } else if (event.key === 'm') {
+        let measureElement = document.querySelectorAll('button[type=button][title="Measure"]')[0];
+        measureElement.click();
+    } else if (event.key === 'b') {
+        let bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
+        bboxElement.click();
+    }
+});
+
+
+// copy to clipboard function
+function copyToClipboard() {
+    const copyText = document.getElementById('bbox');
+    copyText.select();
+    copyText.setSelectionRange(0, 99999); /*For mobile devices*/
+    document.execCommand('copy');
+}
+const copyButton = document.getElementById('CopyToClipboard');
+copyButton.addEventListener('click', copyToClipboard);
+
+// buttons for search function
+document.addEventListener('DOMContentLoaded', function () {
+    // add a svg icon to the element Button with title="Search"
+    let searchElement = document.querySelector('.ol-search button[title="Search"]');
+    searchElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+    searchElement.style.margin = "2px 1px"
+    // add a svg icon to the element Button with title="ol-revers"
+    let reverseElement = document.querySelector('.ol-search button[title="click on the map"]');
+    reverseElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M0.900024 7.50002C0.900024 3.85495 3.85495 0.900024 7.50002 0.900024C11.1451 0.900024 14.1 3.85495 14.1 7.50002C14.1 11.1451 11.1451 14.1 7.50002 14.1C3.85495 14.1 0.900024 11.1451 0.900024 7.50002ZM7.50002 1.80002C4.35201 1.80002 1.80002 4.35201 1.80002 7.50002C1.80002 10.648 4.35201 13.2 7.50002 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.35201 10.648 1.80002 7.50002 1.80002ZM3.07504 7.50002C3.07504 5.05617 5.05618 3.07502 7.50004 3.07502C9.94388 3.07502 11.925 5.05617 11.925 7.50002C11.925 9.94386 9.94388 11.925 7.50004 11.925C5.05618 11.925 3.07504 9.94386 3.07504 7.50002ZM7.50004 3.92502C5.52562 3.92502 3.92504 5.52561 3.92504 7.50002C3.92504 9.47442 5.52563 11.075 7.50004 11.075C9.47444 11.075 11.075 9.47442 11.075 7.50002C11.075 5.52561 9.47444 3.92502 7.50004 3.92502ZM7.50004 5.25002C6.2574 5.25002 5.25004 6.25739 5.25004 7.50002C5.25004 8.74266 6.2574 9.75002 7.50004 9.75002C8.74267 9.75002 9.75004 8.74266 9.75004 7.50002C9.75004 6.25738 8.74267 5.25002 7.50004 5.25002ZM6.05004 7.50002C6.05004 6.69921 6.69923 6.05002 7.50004 6.05002C8.30084 6.05002 8.95004 6.69921 8.95004 7.50002C8.95004 8.30083 8.30084 8.95002 7.50004 8.95002C6.69923 8.95002 6.05004 8.30083 6.05004 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+    reverseElement.style.margin = "2px 1px"
+    // add word to button layer switcher left
+    let left_switch = document.querySelector('.layerSwitcherLeft button');
+    left_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+    // add word to button layer switcher right
+    let right_switch = document.querySelector('.layerSwitcherRight button');
+    right_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+});
+
+let model = null;
+document.addEventListener('DOMContentLoaded', async function () {
+    const MODEL_URL = 'http://127.0.0.1:8080/model.json';
+
+    // Show loading spinner
+    let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
+    predictElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+
+    model = await tf.loadGraphModel(MODEL_URL);
+    const dummyInput = tf.ones(model.inputs[0].shape);
+    const warmupResults = model.execute(dummyInput);
+    tf.dispose([warmupResults, dummyInput])
+
+    // Remove loading spinner and restore original icon
+    predictElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+});
 
 // In the current implementation of LayerSwitcher layers don't overlap, so we turn off opacity.
 document.body.classList.add('hideOpacity')
