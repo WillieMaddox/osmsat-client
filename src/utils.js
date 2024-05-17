@@ -1,5 +1,10 @@
 import { getArea, getLength } from 'ol/sphere';
 import { Fill, Stroke, Style, Text, RegularShape, Circle as CircleStyle } from 'ol/style';
+import * as tf from "@tensorflow/tfjs";
+import labels from "./labels.json";
+
+const numClass = labels.length;
+
 
 const style = new Style({
     fill: new Fill({
@@ -177,23 +182,117 @@ const formatArea = function (polygon) {
     return output;
 };
 
+/**
+ * Preprocess image / frame before forwarded into the model
+ * @param {HTMLVideoElement|HTMLImageElement} source
+ * @param {Number} modelWidth
+ * @param {Number} modelHeight
+ * @returns input tensor, xRatio and yRatio
+ */
+const preprocess = (source, modelWidth, modelHeight) => {
+    let xRatio, yRatio; // ratios for boxes
+
+    const input = tf.tidy(() => {
+        const img = tf.browser.fromPixels(source);
+
+        // padding image to square => [n, m] to [n, n], n > m
+        const [h, w] = img.shape.slice(0, 2); // get source width and height
+        const maxSize = Math.max(w, h); // get max size
+        const imgPadded = img.pad([
+            [0, maxSize - h], // padding y [bottom only]
+            [0, maxSize - w], // padding x [right only]
+            [0, 0],
+        ]);
+
+        xRatio = maxSize / w; // update xRatio
+        yRatio = maxSize / h; // update yRatio
+
+        return tf.image
+            .resizeBilinear(imgPadded, [modelWidth, modelHeight]) // resize frame
+            .div(255.0) // normalize
+            .expandDims(0); // add batch
+    });
+
+    return [input, xRatio, yRatio];
+};
+
+/**
+ * Function run inference and do detection from source.
+ * @param {HTMLImageElement|HTMLVideoElement} source
+ * @param {tf.GraphModel} model loaded YOLOv8 tensorflow.js model
+ */
+export const detect = async (source, model) => {
+
+    tf.engine().startScope(); // start scoping tf engine
+    const [input, xRatio, yRatio] = preprocess(source, 640, 640); // preprocess image
+
+    const res = model.predict(input); // inference model
+    const transRes = res.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
+    const boxes = tf.tidy(() => {
+        const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
+        const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
+        const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
+        const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
+        return tf
+            .concat(
+                [
+                    y1,
+                    x1,
+                    tf.add(y1, h), //y2
+                    tf.add(x1, w), //x2
+                ],
+                2
+            )
+            .squeeze();
+    }); // process boxes [y1, x1, y2, x2]
+
+    const [scores, classes] = tf.tidy(() => {
+        // class scores
+        const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
+        return [rawScores.max(1), rawScores.argMax(1)];
+    }); // get max scores and classes index
+
+    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2); // NMS to filter boxes
+
+    const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
+    const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
+    const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
+
+    return [boxes_data, scores_data, classes_data];
+};
+
 export function imageCord2WorldCords(img_x, img_y, tile_x, tile_y, zoom) {
-    // img_x is 0 to 1 of the tile size
-    // img_y is 0 to 1 of the tile size
-    // tile_x is the x index of the tile
-    // tile_y is the y index of the tile
-    // zoom is the zoom level
-    function getTileCoords(tileX, tileY, zoom) {
-        const n = Math.pow(2, zoom);
-        const lon_deg = tileX / n * 360.0 - 180.0;
-        const lat_rad = Math.atan(Math.sinh(Math.PI * (1 - 2 * tileY / n)));
-        const lat_deg = lat_rad * (180.0 / Math.PI);
-        return { lat: lat_deg, lon: lon_deg };
+    // Convert tile coordinates to latitude and longitude
+    function tileZXYToLatLon(x, y, zoomLevel) {
+        const MIN_ZOOM_LEVEL = 0;
+        const MAX_ZOOM_LEVEL = 22;
+        if (zoomLevel < MIN_ZOOM_LEVEL || zoomLevel > MAX_ZOOM_LEVEL) {
+            throw new Error(`Zoom level value is out of range [${MIN_ZOOM_LEVEL},${MAX_ZOOM_LEVEL}]`);
+        }
+
+        const z = Math.trunc(zoomLevel);
+        const maxXY = (1 << z) - 1;
+        if (x < 0 || x > maxXY || y < 0 || y > maxXY) {
+            throw new Error(`Tile coordinates are out of range [0,${maxXY}]`);
+        }
+
+        const lon = (x / (1 << z)) * 360 - 180;
+        const n = Math.PI - (2 * Math.PI * y) / (1 << z);
+        const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
+        return { lat, lon };
     }
-    const startingCoords = getTileCoords(tile_x, tile_y, zoom);
-    const n = Math.pow(2, zoom);
-    const lon_deg = startingCoords.lon + img_x / n * 360.0;
-    const lat_deg = startingCoords.lat + img_y / n * 180.0;
+
+    const startingCoords = tileZXYToLatLon(tile_x, tile_y, zoom);
+    const img_size = 640; // size of the image
+
+    // Each tile is a part of the world map
+    const worldSize = Math.pow(2, zoom); // total size of the map at the current zoom level
+    const lat_deg_per_pixel = 360 / worldSize;
+    const lon_deg_per_pixel = 360 / worldSize;
+
+    const lon_deg = startingCoords.lon + (img_x / img_size) * lon_deg_per_pixel;
+    const lat_deg = startingCoords.lat - (img_y / img_size) * lat_deg_per_pixel;
+
     return [lat_deg, lon_deg];
 }
 

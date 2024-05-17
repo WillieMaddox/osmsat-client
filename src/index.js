@@ -10,11 +10,12 @@ import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer';
 import { Attribution, MousePosition, ScaleLine } from 'ol/control';
 import { GeoJSON, TopoJSON, GPX, IGC, KML, WKB } from 'ol/format';
 import { createStringXY, toStringHDMS } from 'ol/coordinate';
-import { LineString, Point } from 'ol/geom';
+import { LineString, Point, Polygon } from 'ol/geom';
 import { ATTRIBUTION } from 'ol/source/OSM'
 import LayerGroup from 'ol/layer/Group';
 import { getCenter } from 'ol/extent';
 import { transform } from 'ol/proj';
+import { Feature } from 'ol';
 import View from 'ol/View';
 import Map from 'ol/Map';
 
@@ -26,11 +27,10 @@ import Swipe from 'ol-ext/control/Swipe';
 import Bar from 'ol-ext/control/Bar';
 
 import { randomColor, meter2pixel, meter2tile, formatLength, formatArea } from './utils';
-import { style, labelStyle, tipStyle, modifyStyle, imageCord2WorldCords } from './utils';
-import * as tf from '@tensorflow/tfjs';
+import { style, labelStyle, tipStyle, modifyStyle } from './utils';
 
+let zoom = 18, center = [-110.83, 32.155];
 
-let zoom = 16, center = [-110.83, 32.155];
 function coordinateFormatPIXEL(coord) {
     let zoom = view.getZoom()
     let xypixel = meter2pixel(coord[0], coord[1], zoom)
@@ -320,7 +320,9 @@ $RightLayerLabelDiv.style.padding = '0.1rem'
 $RightLayerLabelDiv.style.paddingLeft = '0.5rem'
 document.getElementsByClassName('ol-viewport')[0].appendChild($RightLayerLabelDiv)
 
-let swipe = new Swipe();
+let swipe = new Swipe({
+    position: .1
+});
 
 function switchleft(layer) {
     let add_layers = [];
@@ -716,55 +718,70 @@ showSegments.onchange = function () {
     measureDraw.getOverlay().changed();
 };
 
+// makeing a vector layer for detections
+const geojsonSource = new VectorSource();
+const geojsonLayer = new VectorLayer({
+    source: geojsonSource,
+    title: "Detections",
+    visible: true,
+    baseLayer: false,
+    displayInLayerSwitcher: true,
+    style: new Style({
+        stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
+    }),
+});
+map.addLayer(geojsonLayer);
+rightgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
+leftgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
 
+// YOLO predict code
+const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
+const processedTiles = new Set();
 
-// yolo predict code
-// Add control to toggle the debug layer.
-function runModelOnTiles() {
+async function runModelOnTiles() {
     const resources = performance.getEntriesByType('resource');
     const imageResources = resources.filter(resource => resource.initiatorType === 'img');
     const imagePaths = imageResources.map(resource => resource.name);
-    let googlePaths = imagePaths.filter(path => path.includes('google'));
-    let googleTiles = googlePaths.filter(path => path.includes('19') || path.includes('20'));
-    console.log(googleTiles);
-
-    googleTiles.slice(0, 1).forEach(async (tile) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.src = tile;
-        img.onload = async function () {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-
-            // convert image to batch of 1 image with size 640x640 and 0 to 1 values
-            const imageData = ctx.getImageData(0, 0, img.width, img.height);
-            const tensor = tf.browser.fromPixels(imageData, 3);
-            const reshapedTensor = tensor.reshape([1, img.height, img.width, 3]);
-            const resizedTensor = tf.image.resizeNearestNeighbor(reshapedTensor, [640, 640]);
-            const normalizedTensor = resizedTensor.div(tf.scalar(255));
-
-            // run model
-            const results = model.predict(normalizedTensor); // inference model
-
-            // convert [1, 94, 8400] into the OBB results 89 classes + 5 bounding box values
-            console.log(results);
-
-            tf.dispose([tensor, reshapedTensor, resizedTensor, normalizedTensor]);
-        }
-    });
+    const googlePaths = imagePaths.filter(path => path.includes('google'));
+    const googleTiles = googlePaths.filter(path => path.includes('18'));
+    const tilesToProcess = googleTiles.filter(tile => !processedTiles.has(tile));
+    tfjs_worker.postMessage(tilesToProcess); // send to web worker
+    tilesToProcess.forEach(tile => processedTiles.add(tile));
+    console.log('Processed Tiles:', processedTiles.size, processedTiles);
 }
 
-let predictButton = new Toggle({
+// Listen for messages from the worker
+tfjs_worker.onmessage = function (event) {
+    const { results } = event.data;
+
+    // Save cords to geojson format
+    let stopwatch = performance.now();
+    results.forEach(([x1, y1, x2, y2, score, className]) => {
+        // Create a box feature using cords
+        const boxCoords = [[[x1, y1], [x1, y2], [x2, y2], [x2, y1], [x1, y1]]];
+        const boxFeature = new Feature({
+            geometry: new Polygon(boxCoords).transform('EPSG:4326', 'EPSG:3857')
+        });
+        geojsonSource.addFeature(boxFeature);
+    });
+    console.log('Time to process:', performance.now() - stopwatch);
+};
+
+const predictButton = new Toggle({
     title: "Predict",
     className: "predict-button",
     html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
-    active: false,
-    onToggle: function (active) { runModelOnTiles() }
+    active: false
 });
 mainbar.addControl(predictButton);
+
+// Set up the PerformanceObserver to observe resource entries
+const observer = new PerformanceObserver((list) => {
+    if (predictButton.getActive()) {
+        runModelOnTiles();
+    }
+});
+observer.observe({ entryTypes: ['resource'] });
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
 document.addEventListener('keydown', function (event) {
@@ -782,7 +799,6 @@ document.addEventListener('keydown', function (event) {
         bboxElement.click();
     }
 });
-
 
 // copy to clipboard function
 function copyToClipboard() {
@@ -810,23 +826,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // add word to button layer switcher right
     let right_switch = document.querySelector('.layerSwitcherRight button');
     right_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-});
-
-let model = null;
-document.addEventListener('DOMContentLoaded', async function () {
-    const MODEL_URL = 'http://127.0.0.1:8080/model.json';
-
-    // Show loading spinner
-    let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
-    predictElement.innerHTML = '<svg id="star" width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-
-    model = await tf.loadGraphModel(MODEL_URL);
-    const dummyInput = tf.ones(model.inputs[0].shape);
-    const warmupResults = model.execute(dummyInput);
-    tf.dispose([warmupResults, dummyInput])
-
-    // Remove loading spinner and restore original icon
-    predictElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
 });
 
 // In the current implementation of LayerSwitcher layers don't overlap, so we turn off opacity.
