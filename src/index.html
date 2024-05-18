@@ -12,7 +12,35 @@
 
 <body>
   <div id="map">
+
     <div id="panel" class="ol-attribution">
+
+      <div id="modelInfoElement" style="display:none; padding: 5px 0px; justify-content: space-around; width: 85%;">
+
+        <div>
+          <div id="modelLoading">
+            &nbsp; Model Loading &nbsp;
+          </div>
+        </div>
+
+        <div>
+          <label for="model">Model:</label>
+          <select id="modelName">
+            <option value="yolob8s_allplanes_class_89_hbb_web_model">YOLOv8 AllPlanes Class 89</option>
+            <option value="yolob8s_allplanes_class_89_obb_web_model">YOLOv8 AllPlanes Class 89 OBB</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="modelType">Model Type:</label>
+          <select id="modelType">
+            <option value="hbb">HBB</option>
+            <option value="obb">OBB</option>
+          </select>
+        </div>
+
+        <button id="loadModel">Load Model</button>
+      </div>
 
       <div id="measure" style="display:none">
         <label for="type">Measurement type:</label>
@@ -31,7 +59,8 @@
       <div id="formatted" style="display:none">
         <input class="field-CSV" type="text" id="bbox" readonly>
         <button class="CopyIcon" id="CopyToClipboard">
-          <svg width="1.25rem" height="1.25rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" style="transform: translateY(.15rem);">
+          <svg width="1.25rem" height="1.25rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"
+            style="transform: translateY(.15rem);">
             <path
               d="M1 9.50006C1 10.3285 1.67157 11.0001 2.5 11.0001H4L4 10.0001H2.5C2.22386 10.0001 2 9.7762 2 9.50006L2 2.50006C2 2.22392 2.22386 2.00006 2.5 2.00006L9.5 2.00006C9.77614 2.00006 10 2.22392 10 2.50006V4.00002H5.5C4.67158 4.00002 4 4.67159 4 5.50002V12.5C4 13.3284 4.67158 14 5.5 14H12.5C13.3284 14 14 13.3284 14 12.5V5.50002C14 4.67159 13.3284 4.00002 12.5 4.00002H11V2.50006C11 1.67163 10.3284 1.00006 9.5 1.00006H2.5C1.67157 1.00006 1 1.67163 1 2.50006V9.50006ZM5 5.50002C5 5.22388 5.22386 5.00002 5.5 5.00002H12.5C12.7761 5.00002 13 5.22388 13 5.50002V12.5C13 12.7762 12.7761 13 12.5 13H5.5C5.22386 13 5 12.7762 5 12.5V5.50002Z"
               fill="black" fill-rule="evenodd" clip-rule="evenodd"></path>
@@ -40,7 +69,105 @@
       </div>
 
     </div>
-  </div>
+
+    <div id="HowToUse">
+      <svg id="HowToIcon" width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M7.49991 0.876892C3.84222 0.876892 0.877075 3.84204 0.877075 7.49972C0.877075 11.1574 3.84222 14.1226 7.49991 14.1226C11.1576 14.1226 14.1227 11.1574 14.1227 7.49972C14.1227 3.84204 11.1576 0.876892 7.49991 0.876892ZM1.82707 7.49972C1.82707 4.36671 4.36689 1.82689 7.49991 1.82689C10.6329 1.82689 13.1727 4.36671 13.1727 7.49972C13.1727 10.6327 10.6329 13.1726 7.49991 13.1726C4.36689 13.1726 1.82707 10.6327 1.82707 7.49972ZM8.24992 4.49999C8.24992 4.9142 7.91413 5.24999 7.49992 5.24999C7.08571 5.24999 6.74992 4.9142 6.74992 4.49999C6.74992 4.08577 7.08571 3.74999 7.49992 3.74999C7.91413 3.74999 8.24992 4.08577 8.24992 4.49999ZM6.00003 5.99999H6.50003H7.50003C7.77618 5.99999 8.00003 6.22384 8.00003 6.49999V9.99999H8.50003H9.00003V11H8.50003H7.50003H6.50003H6.00003V9.99999H6.50003H7.00003V6.99999H6.50003H6.00003V5.99999Z"
+          fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+      </svg>
+
+      <div id="infoPanel" style="display: none; line-height: 1.25em;">
+        <h2>OSMSAT Tool</h2>
+        <p style="color: #999; line-height: 1em;">Version 0.2</p>
+        <p>This tool allows you to perform various actions on the map:</p>
+
+        <p> <strong>Layers:</strong></p>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+          <svg width="1.25rem" height="1.25rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"
+            style="margin-right: 0.5em; padding-left:2em;">
+            <path
+              d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z"
+              fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+          </svg>
+          <strong>Base Layers:</strong> &nbsp; Choose between base layers like OpenStreetMap, Google Maps, and Bing Maps.
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+          <svg width="1.25rem" height="1.25rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"
+            style="margin-right: 0.5em; padding-left:2em;">
+            <path
+              d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z"
+              fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+          </svg>
+          <strong>Vector Layers:</strong> &nbsp; View various overlays on the map like detections or other annotations.
+        </div>
+
+        <p><strong>Interactions:</strong></p>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+          <svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"
+            style="margin-right: 0.5em; padding-left:2em;">
+            <path
+              d="M12.5 2H8V7H13V2.5C13 2.22386 12.7761 2 12.5 2ZM13 8H8V13H12.5C12.7761 13 13 12.7761 13 12.5V8ZM7 7V2H2.5C2.22386 2 2 2.22386 2 2.5V7H7ZM2 8V12.5C2 12.7761 2.22386 13 2.5 13H7V8H2ZM2.5 1C1.67157 1 1 1.67157 1 2.5V12.5C1 13.3284 1.67157 14 2.5 14H12.5C13.3284 14 14 13.3284 14 12.5V2.5C14 1.67157 13.3284 1 12.5 1H2.5Z"
+              fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+          </svg>
+          <strong>Toggle Tile Grid:</strong> &nbsp; Show or hide the tile grid on the map.
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+          <svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"
+            style="margin-right: 0.5em; padding-left:2em;">
+            <path
+              d="M12.5 2H2.5C2.22386 2 2 2.22386 2 2.5V12.5C2 12.7761 2.22386 13 2.5 13H12.5C12.7761 13 13 12.7761 13 12.5V2.5C13 2.22386 12.7761 2 12.5 2ZM2.5 1C1.67157 1 1 1.67157 1 2.5V12.5C1 13.3284 1.67157 14 2.5 14H12.5C13.3284 14 14 13.3284 14 12.5V2.5C14 1.67157 13.3284 1 12.5 1H2.5Z"
+              fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+          </svg>
+          <strong>Draw Box:</strong> &nbsp; Get world coordinates of a drawn bounding box.
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+          <svg width="1.25rem" height="1.25rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"
+            style="margin-right: 0.5em; padding-left:2em;">
+            <path
+              d="M0.5 4C0.223858 4 0 4.22386 0 4.5V10.5C0 10.7761 0.223858 11 0.5 11H14.5C14.7761 11 15 10.7761 15 10.5V4.5C15 4.22386 14.7761 4 14.5 4H0.5ZM1 10V5H2.075V7.5C2.075 7.73472 2.26528 7.925 2.5 7.925C2.73472 7.925 2.925 7.73472 2.925 7.5V5H4.075V6.5C4.075 6.73472 4.26528 6.925 4.5 6.925C4.73472 6.925 4.925 6.73472 4.925 6.5V5H6.075V6.5C6.075 6.73472 6.26528 6.925 6.5 6.925C6.73472 6.925 6.925 6.73472 6.925 6.5V5H8.075V7.5C8.075 7.73472 8.26528 7.925 8.5 7.925C8.73472 7.925 8.925 7.73472 8.925 7.5V5H10.075V6.5C10.075 6.73472 10.2653 6.925 10.5 6.925C10.7347 6.925 10.925 6.73472 10.925 6.5V5H12.075V6.5C12.075 6.73472 12.2653 6.925 12.5 6.925C12.7347 6.925 12.925 6.73472 12.925 6.5V5H14V10H1Z"
+              fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+          </svg>
+          <strong>Measure Distances:</strong> &nbsp; Measure cumlative map distance between various points.
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+          <svg width="1.25rem" height="1.25rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"
+            style="margin-right: 0.5em; padding-left:2em;">
+            <path
+              d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z"
+              fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+          </svg>
+          <strong>Detect Objects:</strong> &nbsp; Run a YOLOv8 model on the tiles to detect objects.
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+          <svg width="1.25rem" height="1.25rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"
+            style="margin-right: 0.5em; padding-left:2em;">
+            <path
+              d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z"
+              fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
+          </svg>
+          <strong>Search Locations:</strong> &nbsp; Use a search bar to find locations on the map.
+        </div>
+
+        <p><strong>Keyboard shortcuts:</strong></p>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+          <strong>d</strong>: Toggles the visibility of the the grid tiles &#128065;
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+          <strong>b</strong>: Toggles the bounding box drawing mode &#128394
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+          <strong>p</strong>: Toggles the object detection prediction mode &#128161;
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+          <strong>m</strong>: Toggles the measurement mode &#128207;
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+          <strong>h</strong>: Toggles the model info panel &#128220;
+        </div>
+      </div>
+
+    </div>
 </body>
 
 </html>

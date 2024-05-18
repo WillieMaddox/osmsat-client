@@ -13,7 +13,7 @@ import { createStringXY, toStringHDMS } from 'ol/coordinate';
 import { LineString, Point, Polygon } from 'ol/geom';
 import { ATTRIBUTION } from 'ol/source/OSM'
 import LayerGroup from 'ol/layer/Group';
-import { getCenter } from 'ol/extent';
+import { containsCoordinate, getCenter } from 'ol/extent';
 import { transform } from 'ol/proj';
 import { Feature } from 'ol';
 import View from 'ol/View';
@@ -27,9 +27,9 @@ import Swipe from 'ol-ext/control/Swipe';
 import Bar from 'ol-ext/control/Bar';
 
 import { randomColor, meter2pixel, meter2tile, formatLength, formatArea } from './utils';
-import { style, labelStyle, tipStyle, modifyStyle } from './utils';
+import { style, labelStyle, tipStyle, modifyStyle, polygonStyleFunction } from './utils';
 
-let zoom = 18, center = [-110.83, 32.155];
+let zoom = 16, center = [-110.83, 32.155];
 
 function coordinateFormatPIXEL(coord) {
     let zoom = view.getZoom()
@@ -321,7 +321,7 @@ $RightLayerLabelDiv.style.paddingLeft = '0.5rem'
 document.getElementsByClassName('ol-viewport')[0].appendChild($RightLayerLabelDiv)
 
 let swipe = new Swipe({
-    position: .1
+    position: .03
 });
 
 function switchleft(layer) {
@@ -409,7 +409,7 @@ function initswipelayer({ layergroup, right, idx = 0 } = {}) {
     }
     // console.log(layer.get('title') + (right?" right":" left"));
 }
-initswipelayer({ layergroup: leftgroup, right: false, idx: 5 })
+initswipelayer({ layergroup: leftgroup, right: false, idx: 10 })
 initswipelayer({ layergroup: rightgroup, right: true, idx: 1 })
 map.addControl(swipe);
 
@@ -726,9 +726,7 @@ const geojsonLayer = new VectorLayer({
     visible: true,
     baseLayer: false,
     displayInLayerSwitcher: true,
-    style: new Style({
-        stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
-    }),
+    style: polygonStyleFunction
 });
 map.addLayer(geojsonLayer);
 rightgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
@@ -743,35 +741,79 @@ async function runModelOnTiles() {
     const imageResources = resources.filter(resource => resource.initiatorType === 'img');
     const imagePaths = imageResources.map(resource => resource.name);
     const googlePaths = imagePaths.filter(path => path.includes('google'));
-    const googleTiles = googlePaths.filter(path => path.includes('18'));
+    const googleTiles = googlePaths.filter(path => path.endsWith('z=17') || path.endsWith('z=18') || path.endsWith('z=19'));
     const tilesToProcess = googleTiles.filter(tile => !processedTiles.has(tile));
     tfjs_worker.postMessage(tilesToProcess); // send to web worker
     tilesToProcess.forEach(tile => processedTiles.add(tile));
-    console.log('Processed Tiles:', processedTiles.size, processedTiles);
 }
 
 // Listen for messages from the worker
+let modelLoadingStatusElement = document.getElementById('modelLoading');
 tfjs_worker.onmessage = function (event) {
-    const { results } = event.data;
+    const { ready, results, error } = event.data;
 
-    // Save cords to geojson format
-    let stopwatch = performance.now();
-    results.forEach(([x1, y1, x2, y2, score, className]) => {
-        // Create a box feature using cords
-        const boxCoords = [[[x1, y1], [x1, y2], [x2, y2], [x2, y1], [x1, y1]]];
-        const boxFeature = new Feature({
-            geometry: new Polygon(boxCoords).transform('EPSG:4326', 'EPSG:3857')
+    // Check if the message indicates that the model is ready
+    if (ready === true) {
+        let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
+        predictElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+        modelLoadingStatusElement.innerHTML = '&nbsp; Model Loaded &nbsp;';
+        modelLoadingStatusElement.style.backgroundColor = '#00AAFF';
+        return; // Exit the listener function
+    }
+
+    // when changing model show loading icon
+    if (ready === false) {
+        let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
+        predictElement.innerHTML = '<svg id="star" width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+        modelLoadingStatusElement.innerHTML = "&nbsp; Model Loading &nbsp;";
+        modelLoadingStatusElement.style.backgroundColor = 'rgb(255, 165, 0)';
+        return; // Exit the listener function
+    }
+
+    // Handle the results if the model is ready
+    if (results) { // results.corners, results.className, results.score
+        results.forEach(result => {
+            // invert cords to match the map
+            let corners = result.corners.map(cord => [cord[1], cord[0]]);
+            corners.push(corners[0]);
+            const boxFeature = new Feature({
+                geometry: new Polygon([corners]).transform('EPSG:4326', 'EPSG:3857'),
+                classIndex: result.className,
+                score: result.score
+            });
+            geojsonSource.addFeature(boxFeature);
         });
-        geojsonSource.addFeature(boxFeature);
-    });
-    console.log('Time to process:', performance.now() - stopwatch);
+    }
+
+    // Handle errors
+    if (error) {
+        console.error('Error:', error);
+        // Add error handling logic as needed
+    }
+};
+
+const modelElement = document.getElementById('modelInfoElement');
+const modelLoading = document.getElementById('loadModel');
+const modelName = document.getElementById('modelName');
+const modelType = document.getElementById('modelType');
+
+modelLoading.onclick = function () {
+    const model = modelName.value;
+    const type = modelType.value;
+    tfjs_worker.postMessage({ model, type });
 };
 
 const predictButton = new Toggle({
     title: "Predict",
     className: "predict-button",
-    html: '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
-    active: false
+    html: '<svg id="star" width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
+    active: false,
+    onToggle: function (active) {
+        if (active) {
+            runModelOnTiles();
+        }
+        modelElement.style.display = active ? 'flex' : 'none';
+    }
 });
 mainbar.addControl(predictButton);
 
@@ -782,6 +824,7 @@ const observer = new PerformanceObserver((list) => {
     }
 });
 observer.observe({ entryTypes: ['resource'] });
+
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
 document.addEventListener('keydown', function (event) {
@@ -798,6 +841,10 @@ document.addEventListener('keydown', function (event) {
         let bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
         bboxElement.click();
     }
+    else if (event.key === 'h') {
+        const modelElement = document.getElementById('modelInfoElement');
+        modelElement.style.display = modelElement.style.display === 'none' ? 'flex' : 'none';
+    }
 });
 
 // copy to clipboard function
@@ -809,6 +856,23 @@ function copyToClipboard() {
 }
 const copyButton = document.getElementById('CopyToClipboard');
 copyButton.addEventListener('click', copyToClipboard);
+
+
+// information buttton
+const howToUse = document.getElementById('HowToUse');
+const infoPanel = document.getElementById('infoPanel');
+const howToIcon = document.getElementById('HowToIcon');
+howToIcon.addEventListener('click', () => {
+    infoPanel.style.display = infoPanel.style.display === 'none' ? 'block' : 'none';
+    // make the background blue when the info panel is open
+    if (infoPanel.style.display === 'block') {
+        howToUse.style.backgroundColor = '#00AAFF';
+        howToIcon.style.color = 'white';
+    } else {
+        howToUse.style.backgroundColor = 'white';
+        howToIcon.style.color = 'black';
+    }
+});
 
 // buttons for search function
 document.addEventListener('DOMContentLoaded', function () {

@@ -29,18 +29,28 @@ body {
     right: auto;
     border-radius: 5px;
     position: absolute;
-
     z-index: 50;
-    width: 50vw;
-    left: 25vw;
-
+    width: 33vw;
+    left: 50%;
+    transform: translateX(-50%);
     justify-content: center;
     align-items: center;
     text-align: center;
-
     padding: 1px .5em;
     color: var(--ol-foreground-color);
     text-shadow: 0 0 2px var(--ol-background-color);
+}
+
+@media screen and (max-width: 1440px) {
+    #panel {
+        width: 75vw !important;
+    }
+}
+
+@media screen and (max-width: 2100px) {
+    #panel {
+        width: 50vw;
+    }
 }
 
 .ol-control.ol-layerswitcher .panel-container {
@@ -48,7 +58,7 @@ body {
 }
 
 #formatted input {
-    width: 45vw;
+    width: 30vw;
     height: 1.5rem;
 }
 
@@ -87,6 +97,12 @@ body {
     border-radius: 5px;
     margin: 3px;
     position: relative;
+    background-color: --ol-partial-background-color;
+}
+
+.CopyIcon:hover {
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
+    cursor: pointer;
 }
 
 .CopyIcon.svg {
@@ -98,6 +114,55 @@ body {
     width: 25vw;
     margin-bottom: 5px;
 }
+
+#modelLoading {
+    background-color: rgb(255, 165, 0);
+    padding: 0 5px;
+    border-radius: 1000px;
+    border: 1px solid #000;
+    color: #fff;
+}
+
+#HowToUse {
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    font-family: "Arial";
+    font-size: 12pt;
+    z-index: 30;
+    background-color: var(--ol-background-color);
+    border-radius: 2px;
+    margin: 2px 1px;
+    width: 2em;
+    height: 2em;
+    line-height: .4em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#HowToUse:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+#infoPanel {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 25px;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    height: auto;
+    width: 75vw;
+    transform: translate(-50%, -50%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+
 
 /* Open Layer Mods */
 @keyframes spin {
@@ -112,7 +177,6 @@ body {
 
 #star {
     animation: spin 2s linear infinite;
-
 }
 
 .ol-control.ol-search>button:before {
