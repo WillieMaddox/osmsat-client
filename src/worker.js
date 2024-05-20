@@ -5,6 +5,8 @@ const numClass = labels.length;
 let BASE_DIR = null;
 let model = null;
 let type = null;
+const NMS_IOU_THRESHOLD = 0.5;
+const NMS_SCORE_THRESHOLD = 0.5;
 
 // Load and warm up the model
 async function loadModel(MODEL_NAME) {
@@ -194,7 +196,7 @@ export const detect = async (source, model) => {
         return [rawScores.max(1), rawScores.argMax(1)];
     }); // get max scores and classes index
 
-    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.5, 0.5); // NMS to filter boxes
+    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD); // NMS to filter boxes
     // console.log(nms.dataSync());
 
     const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
@@ -246,7 +248,7 @@ export const detect_obb = async (source, model) => {
     const boxesForNMS = boxes.slice([0, 0], [-1, 4]);
 
     // nms
-    const nms = await tf.image.nonMaxSuppressionAsync(boxesForNMS, scores, 500, 0.5, 0.5); // NMS to filter boxes
+    const nms = await tf.image.nonMaxSuppressionAsync(boxesForNMS, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD); // NMS to filter boxes
     // console.log(nms.dataSync());
 
     const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
@@ -258,6 +260,7 @@ export const detect_obb = async (source, model) => {
 };
 
 function tileZXYToLatLon(x, y, zoomLevel) {
+    // EPSG:3857
     const z = Math.trunc(zoomLevel);
     const maxXY = (1 << z) - 1;
     if (x < 0 || x > maxXY || y < 0 || y > maxXY) {
