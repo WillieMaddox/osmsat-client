@@ -734,6 +734,7 @@ leftgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
 
 // YOLO predict code
 const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
+tfjs_worker.postMessage({ url: document.URL });
 const processedTiles = new Set();
 
 async function runModelOnTiles() {
@@ -890,6 +891,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // add word to button layer switcher right
     let right_switch = document.querySelector('.layerSwitcherRight button');
     right_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+
+    // load model when DOM loaded
+    tfjs_worker.postMessage({ model: "yolob8s_allplanes_class_89_hbb_web_model", type: "hbb" });
 });
 
 // In the current implementation of LayerSwitcher layers don't overlap, so we turn off opacity.

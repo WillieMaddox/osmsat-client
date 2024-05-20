@@ -2,12 +2,13 @@ import * as tf from '@tensorflow/tfjs';
 import labels from "./labels.json";
 
 const numClass = labels.length;
-let model = await loadModel("yolob8s_allplanes_class_89_hbb_web_model");
-let type = "hbb";
+let BASE_DIR = null;
+let model = null;
+let type = null;
 
 // Load and warm up the model
 async function loadModel(MODEL_NAME) {
-    const MODEL_URL = `http://127.0.0.1:8080/${MODEL_NAME}/model.json`;
+    const MODEL_URL = `${BASE_DIR}/models/${MODEL_NAME}/model.json`;
     const model = await tf.loadGraphModel(MODEL_URL);
     const dummyInput = tf.ones(model.inputs[0].shape);
     const warmupResults = model.predict(dummyInput);
@@ -83,7 +84,6 @@ async function processTile(tile) {
             const y_center = (y1 + y2) / 2;
             const width = x2 - x1;
             const height = y2 - y1;
-            console.log(x_center, y_center, width, height, angle);
             const corners = getCorners(x_center, y_center, width, height, angle);
             const worldCorners = corners.map(([x, y]) => imageCord2WorldCords(x, y, x_tile, y_tile, zoom));
             return {
@@ -123,8 +123,12 @@ self.onmessage = async function (event) {
         type = event.data.type;
         self.postMessage({ ready: true });
     }
-};
 
+    // if we get a event.data.url we can update the window.location.href
+    if (event.data.url) {
+        BASE_DIR = event.data.url;
+    };
+};
 
 /**
  * Preprocess image / frame before forwarded into the model

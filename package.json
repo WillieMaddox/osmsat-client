@@ -1,6 +1,6 @@
 {
   "name": "osmsat-client",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "OSMSAT viewer built on OpenLayers",
   "scripts": {
     "clean": "rimraf dist",
@@ -16,6 +16,7 @@
     "@babel/preset-env": "^7.18.2",
     "autoprefixer": "^10.4.7",
     "babel-loader": "^8.2.5",
+    "copy-webpack-plugin": "^12.0.2",
     "css-loader": "^5.1.0",
     "css-minimizer-webpack-plugin": "^4.0.0",
     "dotenv-webpack": "^7.1.0",
