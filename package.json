@@ -4,12 +4,8 @@
   "description": "OSMSAT viewer built on OpenLayers",
   "scripts": {
     "clean": "rimraf dist",
-    "serve": "webpack serve --config webpack.dev.js",
-    "serve2": "webpack serve --mode development",
-    "build": "webpack --config webpack.prod.js",
-    "build2": "webpack --mode production --json > stats.json",
-    "build:dev": "wp --mode development",
-    "build:prod": "wp --mode production"
+    "start": "webpack serve --mode development",
+    "build": "webpack --mode production"
   },
   "devDependencies": {
     "@babel/core": "^7.20.12",
@@ -29,7 +25,6 @@
     "purgecss-webpack-plugin": "^4.1.3",
     "rimraf": "^3.0.2",
     "style-loader": "^2.0.0",
-    "tailwindcss": "^3.1.2",
     "webpack": "^5.76.3",
     "webpack-cli": "^4.8.0",
     "webpack-dev-middleware": "^5.3.3",
@@ -44,7 +39,7 @@
     "ol": "^8.2.0",
     "ol-ext": "^4.0.14"
   },
-  "repository": "https://github.com/darkscript/ol-ol-ext-webpack-example.git",
+  "repository": "https://github.com/WillieMaddox/osmsat-client",
   "author": "Willie Maddox",
   "license": "BSD-3-Clause",
   "private": true

@@ -1,5 +1,3 @@
-const path = require("path");
-const webpack = require("webpack");
 const { merge } = require("webpack-merge");
 const { mode } = require("webpack-nano/argv");
 const parts = require("./webpack.parts");
