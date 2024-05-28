@@ -139,6 +139,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 100;
 }
 
 #HowToUse:hover {
@@ -149,16 +150,18 @@ body {
     background-color: white;
     border: 1px solid #ddd;
     border-radius: 5px;
-    padding: 25px;
+    padding: 15px;
     position: fixed;
     top: 50%;
     left: 50%;
     height: auto;
-    width: 75vw;
+    min-width: 55vw;
+    max-width: 75vw;
     transform: translate(-50%, -50%);
     display: flex;
     justify-content: center;
     align-items: center;
+    font-size: 10pt;
     z-index: 100;
 }
 
@@ -223,12 +226,16 @@ body {
     left: 99vw !important;
 }
 
+.ol-scale-line.ol-unselectable {
+    background-color: transparent;
+}
+
 .ol-scale-line-inner {
     will-change: contents, width;
     position: absolute;
     top: 0;
     right: 0;
-    background-color: #d2d2d28f;
+    background: var(--ol-partial-background-color);
     color: rgb(66, 66, 66);
 }
 

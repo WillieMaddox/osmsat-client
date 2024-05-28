@@ -29,7 +29,8 @@ import Bar from 'ol-ext/control/Bar';
 import { randomColor, meter2pixel, meter2tile, formatLength, formatArea } from './utils';
 import { style, labelStyle, tipStyle, modifyStyle, polygonStyleFunction } from './utils';
 
-let zoom = 16, center = [-110.83, 32.155];
+let zoom = 19, center = [-110.832245, 32.155011];
+// let zoom = 19, center = [-110.869236, 32.140271];
 
 function coordinateFormatPIXEL(coord) {
     let zoom = view.getZoom()
@@ -737,14 +738,32 @@ const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
 tfjs_worker.postMessage({ url: document.URL });
 const processedTiles = new Set();
 
+// run when map has stopped moving
+// Utility function to debounce a function
+function debounce(func, wait) {
+    let timeout;
+    return function (...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+}
+const debouncedRunModelOnTiles = debounce(runModelOnTiles, 1000); // Adjust the debounce delay as needed
+map.on('moveend', function () {
+    if (predictButton.getActive()) {
+        debouncedRunModelOnTiles();
+    }
+});
+
+
 async function runModelOnTiles() {
     const resources = performance.getEntriesByType('resource');
     const imageResources = resources.filter(resource => resource.initiatorType === 'img');
     const imagePaths = imageResources.map(resource => resource.name);
     const googlePaths = imagePaths.filter(path => path.includes('google'));
-    const googleTiles = googlePaths.filter(path => path.endsWith('z=17') || path.endsWith('z=18') || path.endsWith('z=19'));
+    const googleTiles = googlePaths.filter(path => path.endsWith('z=19'));
     const tilesToProcess = googleTiles.filter(tile => !processedTiles.has(tile));
-    tfjs_worker.postMessage(tilesToProcess); // send to web worker
+    tfjs_worker.postMessage({ tiles: tilesToProcess });
     tilesToProcess.forEach(tile => processedTiles.add(tile));
 }
 
@@ -824,7 +843,7 @@ const observer = new PerformanceObserver((list) => {
         runModelOnTiles();
     }
 });
-observer.observe({ entryTypes: ['resource'] });
+// observer.observe({ entryTypes: ['resource'] });
 
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
