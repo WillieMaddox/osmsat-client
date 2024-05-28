@@ -1,16 +1,16 @@
 import * as tf from '@tensorflow/tfjs';
 import labels from "./labels.json";
 
-const numClass = labels.length;
-let BASE_DIR = null;
+let base_dir = null;
 let model = null;
 let type = null;
+const numClass = labels.length;
 const NMS_IOU_THRESHOLD = 0.5;
-const NMS_SCORE_THRESHOLD = 0.5;
+const NMS_SCORE_THRESHOLD = 0.25;
 
 // Load and warm up the model
 async function loadModel(MODEL_NAME) {
-    const MODEL_URL = `${BASE_DIR}/models/${MODEL_NAME}/model.json`;
+    const MODEL_URL = `${base_dir}/models/${MODEL_NAME}/model.json`;
     const model = await tf.loadGraphModel(MODEL_URL);
     const dummyInput = tf.ones(model.inputs[0].shape);
     const warmupResults = model.predict(dummyInput);
@@ -98,23 +98,65 @@ async function processTile(tile) {
     }
 }
 
+function checkAdjacentTiles(tiles) {
+    // Extract coordinates from tile URLs
+    const tileCoords = tiles.map(tile => {
+        const xMatch = tile.match(/[?&]x=(\d+)/);
+        const yMatch = tile.match(/[?&]y=(\d+)/);
+        return { x: parseInt(xMatch[1], 10), y: parseInt(yMatch[1], 10) };
+    });
+
+    // Create a set for quick lookup
+    const tileSet = new Set(tileCoords.map(({ x, y }) => `${x},${y}`));
+
+    // Check for 2x2 adjacent tiles
+    const combos = [];
+    tileCoords.forEach(({ x, y }) => {
+        if (
+            tileSet.has(`${x + 1},${y}`) &&
+            tileSet.has(`${x},${y + 1}`) &&
+            tileSet.has(`${x + 1},${y + 1}`)
+        ) {
+            combos.push([{ x, y }, { x: x + 1, y }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }]);
+            console.log('2x2 tiles found at:', `(${x}, ${y})`, `(${x + 1}, ${y})`, `(${x}, ${y + 1})`, `(${x + 1}, ${y + 1})`);
+            // Remove the 2x2 tiles from the overall set
+            tileSet.delete(`${x},${y}`);
+            tileSet.delete(`${x + 1},${y}`);
+            tileSet.delete(`${x},${y + 1}`);
+            tileSet.delete(`${x + 1},${y + 1}`);
+        }
+    });
+
+    return combos;
+}
+
+
 // Listen for messages from the main thread
 self.onmessage = async function (event) {
 
-    const tiles = event.data;
+    // process tiles into detections
+    if (event.data.tiles) {
+        // check for 2x2 tiles by looking at x,y tile locations
+        let tiles = event.data.tiles;        
+        let combos = checkAdjacentTiles(Object.values(tiles));
 
-    // Process each tile separately
-    for (let i = 0; i < tiles.length; i++) {
-        const tile = tiles[i];
-        try {
-            console.log('Processing tile:', tile);
-            const tileResults = await processTile(tile);
-            // Send the results back to the main thread after processing each tile
-            self.postMessage({ results: tileResults });
-        } catch (error) {
-            console.error('Error processing tile:', error);
-            // Send an error message back to the main thread
-            self.postMessage({ error: 'Error processing tile', tile });
+        // info
+        console.log('Received tiles:', tiles);
+        console.log('2x2 tile combos:', combos);
+
+        // Process each tile separately
+        for (let i = 0; i < tiles.length; i++) {
+            const tile = tiles[i];
+            try {
+                // console.log('Processing tile:', tile);
+                const tileResults = await processTile(tile);
+                // Send the results back to the main thread after processing each tile
+                self.postMessage({ results: tileResults });
+            } catch (error) {
+                console.error('Error processing tile:', error);
+                // Send an error message back to the main thread
+                self.postMessage({ error: 'Error processing tile', tile });
+            }
         }
     }
 
@@ -128,7 +170,7 @@ self.onmessage = async function (event) {
 
     // if we get a event.data.url we can update the window.location.href
     if (event.data.url) {
-        BASE_DIR = event.data.url;
+        base_dir = event.data.url;
     };
 };
 
@@ -279,7 +321,7 @@ export function imageCord2WorldCords(img_x, img_y, tile_x, tile_y, zoom) {
 
     // Each tile is a part of the world map
     const worldSize = Math.pow(2, zoom); // total size of the map at the current zoom level
-    const lat_deg_per_pixel = 360 / worldSize;
+    const lat_deg_per_pixel = 180 / worldSize;
     const lon_deg_per_pixel = 360 / worldSize;
 
     const lon_deg = startingCoords.lon + (img_x / img_size) * lon_deg_per_pixel;
