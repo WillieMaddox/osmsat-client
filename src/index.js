@@ -717,22 +717,24 @@ mainbar.addControl(predictButton);
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
 document.addEventListener('keydown', function (event) {
+    const debugElement = document.querySelectorAll('button[type=button][title="Tiling Grid"]')[0];
+    const predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
+    const measureElement = document.querySelectorAll('button[type=button][title="Measure"]')[0];
+    const bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
+    const modelElement = document.getElementById('modelInfoElement');
+
     if (event.key === 'd') {
-        let debugElement = document.querySelectorAll('button[type=button][title="Tiling Grid"]')[0];
         debugElement.click();
     } else if (event.key === 'p') {
-        let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
         predictElement.click();
     } else if (event.key === 'm') {
-        let measureElement = document.querySelectorAll('button[type=button][title="Measure"]')[0];
         measureElement.click();
     } else if (event.key === 'b') {
-        let bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
         bboxElement.click();
-    }
-    else if (event.key === 'h') {
-        const modelElement = document.getElementById('modelInfoElement');
+    } else if (event.key === 'h') {
         modelElement.style.display = modelElement.style.display === 'none' ? 'flex' : 'none';
+    } else if (event.key === 'q') { // debug shortcut to send a single tile to the worker
+        tfjs_worker.postMessage({ debugTile: { x: 100732, y: 212643, z: 19 } });
     }
 }, { passive: true });
 

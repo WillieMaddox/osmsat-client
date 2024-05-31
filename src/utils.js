@@ -234,36 +234,46 @@ export const coordinateFormatTILE = (view, coord) => {
     return `Z: ${ztile}   X: ${xtile}   Y: ${ytile}   C: ${xcol}   R: ${yrow}`;
 };
 
-function tileZXYToLatLon(x, y, zoomLevel) {
-    // EPSG:3857
-    const z = Math.trunc(zoomLevel);
+
+function tileBounds(x, y, zoomLevel) {
+    const z = parseInt(zoomLevel);
     const maxXY = (1 << z) - 1;
     if (x < 0 || x > maxXY || y < 0 || y > maxXY) {
         throw new Error(`Tile coordinates are out of range [0,${maxXY}]`);
     }
-    const lon = (x / (1 << z)) * 360 - 180;
-    const n = Math.PI - (2 * Math.PI * y) / (1 << z);
-    const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
-    return { lat, lon };
+
+    // Calculate the longitude and latitude of the top-left corner
+    const lon_min = (x / (1 << z)) * 360 - 180;
+    const n_min = Math.PI - (2 * Math.PI * y) / (1 << z);
+    const lat_min = (180 / Math.PI) * Math.atan(Math.sinh(n_min));
+
+    // Calculate the longitude and latitude of the bottom-right corner
+    const lon_max = ((x + 1) / (1 << z)) * 360 - 180;
+    const n_max = Math.PI - (2 * Math.PI * (y + 1)) / (1 << z);
+    const lat_max = (180 / Math.PI) * Math.atan(Math.sinh(n_max));
+
+    return { "lon_min": lon_min, "lat_min": lat_min, "lon_max": lon_max, "lat_max": lat_max };
 }
 
-export function imageCoordToWorldCoords(img_x, img_y, tile_x, tile_y, zoom) {
-    // Get the starting coordinates of the tile
-    const startingCoords = tileZXYToLatLon(tile_x, tile_y, zoom);
-    const img_size = 640; // size of the image
-
-    // Each tile is a part of the world map
-    const worldSize = Math.pow(2, zoom); // total size of the map at the current zoom level
-    const lat_deg_per_pixel = 180 / worldSize;
-    const lon_deg_per_pixel = 360 / worldSize;
-
-    const lon_deg = startingCoords.lon + (img_x / img_size) * lon_deg_per_pixel;
-    const lat_deg = startingCoords.lat - (img_y / img_size) * lat_deg_per_pixel;
-
-    return [lat_deg, lon_deg];
+export function tilePixelToWorld(px, py, img_size, x_tile, y_tile, zoom) {
+    // Get the bounds of the tile in latitude/longitude
+    const tile_bounds = tileBounds(x_tile, y_tile, zoom);
+    // Calculate the relative position within the tile in meters
+    const rel_x = (px / img_size) * (tile_bounds.lon_max - tile_bounds.lon_min) + tile_bounds.lon_min;
+    const rel_y = (py / img_size) * (tile_bounds.lat_max - tile_bounds.lat_min) + tile_bounds.lat_min;
+    return [rel_y, rel_x];
 }
 
-// Function to calculate the 4 corners of the rotated bounding box
+
+/**
+ * Calculates the corners of a rectangle after rotation.
+ * @param {number} x_center - The x-coordinate of the center of the rectangle.
+ * @param {number} y_center - The y-coordinate of the center of the rectangle.
+ * @param {number} width - The width of the rectangle.
+ * @param {number} height - The height of the rectangle.
+ * @param {number} radians - The angle of rotation in radians.
+ * @returns {Array<Array<number>>} - An array of four [x, y] coordinates representing the corners of the rotated rectangle.
+ */
 export function getCorners(x_center, y_center, width, height, radians) {
     // angle goes from -pi/2 to pi/2 with 0 being the horizontal axis in radians
     const cos = Math.cos(radians);

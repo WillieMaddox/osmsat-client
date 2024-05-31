@@ -1,4 +1,4 @@
-import { getCorners, imageCoordToWorldCoords } from './utils.js';
+import { getCorners, tilePixelToWorld } from './utils.js';
 import * as tf from '@tensorflow/tfjs';
 import labels from "./labels.json";
 
@@ -51,6 +51,16 @@ async function combineImages(tiles) {
     return ctx.getImageData(0, 0, 2 * tileWidth, 2 * tileHeight, { colorSpace: 'srgb' });
 }
 
+async function debugTile(tile) {
+    const { x, y, z } = tile;
+    const url = genGoogleUrl(x, y, z);
+    const img = await fetchImage(url);
+    const imageData = getImageData(img);
+    const [boxes, scores, classes] = await detect(imageData, model);
+    const detections = convertDetections(boxes, scores, classes, tile);
+    return detections;
+}
+
 async function processTile(tile, isCombo = false) {
 
     // get image data of the combines tile or a single tile
@@ -89,7 +99,8 @@ function convertDetections(boxes, scores, classes, tile) {
         const width = x2 - x1;
         const height = y2 - y1;
         const corners = getCorners(x_center, y_center, width, height, angle || 0);
-        const worldCorners = corners.map(([x, y]) => imageCoordToWorldCoords(x, y, x_tile, y_tile, zoom));
+        // console.log({ box: box, corners: corners, info: [x_center, y_center, width, height], class: classIndex });
+        const worldCorners = corners.map(([x, y]) => tilePixelToWorld(x, y, 640, x_tile, y_tile, zoom));
         return {
             corners: worldCorners,
             score: scoresArray[i],
@@ -167,6 +178,12 @@ self.onmessage = async function (event) {
     if (event.data.url) { // initialize base_dir
         base_dir = event.data.url;
     }
+
+    if (event.data.debugTile) { // hardcorded debug tile
+        const tile = event.data.debugTile;
+        const debugResults = await debugTile(tile);
+        self.postMessage({ results: debugResults });
+    }
 };
 
 const preprocess = (source, modelWidth, modelHeight) => {
@@ -202,7 +219,7 @@ export const detect = async (source, model) => {
         const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2));
         const x2 = tf.add(x1, w);
         const y2 = tf.add(y1, h);
-        return tf.concat([y1, x1, y2, x2], 2).squeeze();
+        return tf.concat([x1, y1, x2, y2], 2).squeeze();
     });
 
     const [scores, classes] = tf.tidy(() => {
@@ -232,7 +249,7 @@ export const detectOBB = async (source, model) => {
         const x2 = tf.add(x1, w);
         const y2 = tf.add(y1, h);
         const rotation = transRes.slice([0, 0, transRes.shape[2] - 1], [-1, -1, 1]);
-        return tf.concat([y1, x1, y2, x2, rotation], 2).squeeze();
+        return tf.concat([x1, y1, x2, y2, rotation], 2).squeeze();
     });
 
     const [scores, classes] = tf.tidy(() => {
