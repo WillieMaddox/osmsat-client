@@ -241,23 +241,26 @@ export const detectOBB = async (source, model) => {
     const res = model.predict(input);
     const transRes = res.transpose([0, 2, 1]);
 
-    const boxes = tf.tidy(() => {
-        const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
-        const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
-        const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2));
-        const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2));
-        const x2 = tf.add(x1, w);
-        const y2 = tf.add(y1, h);
-        const rotation = transRes.slice([0, 0, transRes.shape[2] - 1], [-1, -1, 1]);
-        return tf.concat([x1, y1, x2, y2, rotation], 2).squeeze();
+    const boxes = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
+        const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
+        const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
+        const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
+        const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
+        const x2 = tf.add(x1, w); // x2
+        const y2 = tf.add(y1, h); // y2
+        const rotation = transRes.slice([0, 0, transRes.shape[2] - 1], [-1, -1, 1]); // rotation, between -π/2 to π/2 radians 
+        const boxes = tf.concat([x1, y1, x2, y2, rotation], 2).squeeze(); // y1 x1 y2 x2 rotation
+        return boxes;
     });
 
     const [scores, classes] = tf.tidy(() => {
-        const rawScores = transRes.slice([0, 0, 5], [-1, -1, numClass]).squeeze(0);
+        const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
         return [rawScores.max(1), rawScores.argMax(1)];
     });
 
-    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
+    // subselect the first 4 values of the box (x1, y1, x2, y2) for nms
+    const nmsBoxes = boxes.slice([0, 0], [-1, 4]);
+    const nms = await tf.image.nonMaxSuppressionAsync(nmsBoxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
     const boxes_data = boxes.gather(nms, 0).dataSync();
     const scores_data = scores.gather(nms, 0).dataSync();
     const classes_data = classes.gather(nms, 0).dataSync();
