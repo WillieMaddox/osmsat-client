@@ -1,3 +1,4 @@
+import { getCorners, imageCoordToWorldCoords } from './utils.js';
 import * as tf from '@tensorflow/tfjs';
 import labels from "./labels.json";
 
@@ -8,350 +9,241 @@ const numClass = labels.length;
 const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
-// Load and warm up the model
 async function loadModel(MODEL_NAME) {
     const MODEL_URL = `${base_dir}/models/${MODEL_NAME}/model.json`;
-    const model = await tf.loadGraphModel(MODEL_URL);
+    model = await tf.loadGraphModel(MODEL_URL);
     const dummyInput = tf.ones(model.inputs[0].shape);
     const warmupResults = model.predict(dummyInput);
     tf.dispose([warmupResults, dummyInput]);
     self.postMessage({ ready: true });
-    return model;
 }
 
-// Helper function to process a single tile
-async function processTile(tile) {
-    // Get tile info from tile name
-    const x_tile = tile.match(/[?&]x=(\d+)/)[1];
-    const y_tile = tile.match(/[?&]y=(\d+)/)[1];
-    const zoom = tile.match(/[?&]z=(\d+)/)[1];
+function genGoogleUrl(x, y, z) {
+    const randomSuffix = Math.floor(Math.random() * 4);
+    return `https://mt${randomSuffix}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
+}
 
-    // Fetch the image as a blob
-    const response = await fetch(tile);
+async function fetchImage(url) {
+    const response = await fetch(url);
     const blob = await response.blob();
+    return createImageBitmap(blob);
+}
 
-    // Convert the blob into ImageData
-    const img = await createImageBitmap(blob);
+function getImageData(img) {
     const canvas = new OffscreenCanvas(img.width, img.height);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, img.width, img.height, { colorSpace: 'srgb' });
+    return ctx.getImageData(0, 0, img.width, img.height, { colorSpace: 'srgb' });
+}
 
-    // Perform detection using the model
+async function combineImages(tiles) {
+    const tileImages = await Promise.all(tiles.map(tile => fetchImage(genGoogleUrl(tile.x, tile.y, tile.z))));
+    const tileWidth = tileImages[0].width;
+    const tileHeight = tileImages[0].height;
+    const canvas = new OffscreenCanvas(2 * tileWidth, 2 * tileHeight);
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(tileImages[0], 0, 0);
+    ctx.drawImage(tileImages[1], tileWidth, 0);
+    ctx.drawImage(tileImages[2], 0, tileHeight);
+    ctx.drawImage(tileImages[3], tileWidth, tileHeight);
+
+    return ctx.getImageData(0, 0, 2 * tileWidth, 2 * tileHeight, { colorSpace: 'srgb' });
+}
+
+async function processTile(tile, isCombo = false) {
+
+    // get image data of the combines tile or a single tile
+    let imageData;
+    if (isCombo) {
+        imageData = await combineImages(tile);
+    } else {
+        const { x, y, z } = tile;
+        const url = genGoogleUrl(x, y, z);
+        const img = await fetchImage(url);
+        imageData = getImageData(img);
+    }
+
+    // run the detections type on the image data
     let boxes, scores, classes;
-    if (type == "hbb") {
+    if (type === "hbb") {
         [boxes, scores, classes] = await detect(imageData, model);
-        // Convert the Float32Array to regular Arrays
-        const boxesArray = Array.from(boxes); // [y1, x1, y2, x2]
-        const scoresArray = Array.from(scores);
-        const classesArray = Array.from(classes);
-        // Create instances by splitting 4 boxes, 1 score, 1 class
-        const instances = classesArray.map((className, i) => [
-            boxesArray.slice(i * 4, (i + 1) * 4),
-            scoresArray[i],
-            className
-        ]);
-        // Convert instances to instance info
-        let detections = instances.map(instance => {
-            const [box, score, classIndex] = instance;
-            const [y1, x1, y2, x2] = box; // [x1, y1, x2, y2]
-            const corners = getCorners(x1, y1, x2 - x1, y2 - y1, 0);
-            const worldCorners = corners.map(([x, y]) => imageCord2WorldCords(x, y, x_tile, y_tile, zoom));
-            return {
-                corners: worldCorners,
-                score: score,
-                className: classIndex
-            };
-        });
-        return detections;
+    } else if (type === "obb") {
+        [boxes, scores, classes] = await detectOBB(imageData, model);
     }
-    else if (type == "obb") {
-        [boxes, scores, classes] = await detect_obb(imageData, model);
-        // Convert the Float32Array to regular Arrays
-        const boxesArray = Array.from(boxes); // y1 x1 y2 x2 rotation
-        const scoresArray = Array.from(scores);
-        const classesArray = Array.from(classes);
-        // Create instances by splitting 5 values for boxes, 1 score, 1 class
-        const instances = classesArray.map((className, i) => [
-            boxesArray.slice(i * 5, (i + 1) * 5),
-            scoresArray[i],
-            className
-        ]);
-        // Convert instances to instance info
-        let detections = instances.map(instance => {
-            const [box, score, classIndex] = instance;
-            const [y1, x1, y2, x2, angle] = box; // y1 x1 y2 x2 rotation
-            // get x_center, y_center, width, height, angle from these values
-            const x_center = (x1 + x2) / 2;
-            const y_center = (y1 + y2) / 2;
-            const width = x2 - x1;
-            const height = y2 - y1;
-            const corners = getCorners(x_center, y_center, width, height, angle);
-            const worldCorners = corners.map(([x, y]) => imageCord2WorldCords(x, y, x_tile, y_tile, zoom));
-            return {
-                corners: worldCorners,
-                score: score,
-                className: classIndex
-            };
-        });
-        return detections;
-    }
+
+    return convertDetections(boxes, scores, classes, tile);
+}
+
+function convertDetections(boxes, scores, classes, tile) {
+    const { x: x_tile, y: y_tile, z: zoom } = Array.isArray(tile) ? tile[0] : tile;
+    const boxesArray = Array.from(boxes);
+    const scoresArray = Array.from(scores);
+    const classesArray = Array.from(classes);
+
+    return classesArray.map((classIndex, i) => {
+        const box = boxesArray.slice(i * (type === "hbb" ? 4 : 5), (i + 1) * (type === "hbb" ? 4 : 5));
+        const [x1, y1, x2, y2, angle] = box;
+        const x_center = (x1 + x2) / 2;
+        const y_center = (y1 + y2) / 2;
+        const width = x2 - x1;
+        const height = y2 - y1;
+        const corners = getCorners(x_center, y_center, width, height, angle || 0);
+        const worldCorners = corners.map(([x, y]) => imageCoordToWorldCoords(x, y, x_tile, y_tile, zoom));
+        return {
+            corners: worldCorners,
+            score: scoresArray[i],
+            className: classIndex
+        };
+    });
 }
 
 function checkAdjacentTiles(tiles) {
-    // Extract coordinates from tile URLs
-    const tileCoords = tiles.map(tile => {
-        const xMatch = tile.match(/[?&]x=(\d+)/);
-        const yMatch = tile.match(/[?&]y=(\d+)/);
-        return { x: parseInt(xMatch[1], 10), y: parseInt(yMatch[1], 10) };
-    });
+    const tileCoords = tiles.map(({ x, y, z }) => ({ x, y, z }));
+    const tileSet = new Set(tileCoords.map(({ x, y, z }) => `${x},${y},${z}`));
 
-    // Create a set for quick lookup
-    const tileSet = new Set(tileCoords.map(({ x, y }) => `${x},${y}`));
-
-    // Check for 2x2 adjacent tiles
     const combos = [];
-    tileCoords.forEach(({ x, y }) => {
+    tileCoords.forEach(({ x, y, z }) => {
         if (
-            tileSet.has(`${x + 1},${y}`) &&
-            tileSet.has(`${x},${y + 1}`) &&
-            tileSet.has(`${x + 1},${y + 1}`)
+            tileSet.has(`${x},${y},${z}`) &&
+            tileSet.has(`${x + 1},${y},${z}`) &&
+            tileSet.has(`${x},${y + 1},${z}`) &&
+            tileSet.has(`${x + 1},${y + 1},${z}`)
         ) {
-            combos.push([{ x, y }, { x: x + 1, y }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }]);
-            console.log('2x2 tiles found at:', `(${x}, ${y})`, `(${x + 1}, ${y})`, `(${x}, ${y + 1})`, `(${x + 1}, ${y + 1})`);
-            // Remove the 2x2 tiles from the overall set
-            tileSet.delete(`${x},${y}`);
-            tileSet.delete(`${x + 1},${y}`);
-            tileSet.delete(`${x},${y + 1}`);
-            tileSet.delete(`${x + 1},${y + 1}`);
+            combos.push([
+                { x, y, z },
+                { x: x + 1, y, z },
+                { x, y: y + 1, z },
+                { x: x + 1, y: y + 1, z }
+            ]);
+            tileSet.delete(`${x},${y},${z}`);
+            tileSet.delete(`${x + 1},${y},${z}`);
+            tileSet.delete(`${x},${y + 1},${z}`);
+            tileSet.delete(`${x + 1},${y + 1},${z}`);
         }
     });
 
-    return combos;
+    const comboTilesSet = new Set(combos.flat().map(({ x, y, z }) => `${x},${y},${z}`));
+    const extraTiles = tiles.filter(({ x, y, z }) => !comboTilesSet.has(`${x},${y},${z}`));
+
+    return { combos, extraTiles };
 }
 
-
-// Listen for messages from the main thread
 self.onmessage = async function (event) {
-
-    // process tiles into detections
     if (event.data.tiles) {
-        // check for 2x2 tiles by looking at x,y tile locations
-        let tiles = event.data.tiles;        
-        let combos = checkAdjacentTiles(Object.values(tiles));
+        const tiles = Object.values(event.data.tiles);
+        // const { combos, extraTiles } = checkAdjacentTiles(tiles);
+        const combos = [];
+        const extraTiles = tiles;
 
-        // info
-        console.log('Received tiles:', tiles);
-        console.log('2x2 tile combos:', combos);
-
-        // Process each tile separately
-        for (let i = 0; i < tiles.length; i++) {
-            const tile = tiles[i];
+        for (const combo of combos) {
             try {
-                // console.log('Processing tile:', tile);
+                const comboResults = await processTile(combo, true);
+                self.postMessage({ results: comboResults });
+            } catch (error) {
+                console.log(error);
+                self.postMessage({ error: 'Error processing combo', combo });
+            }
+        }
+
+        for (const tile of extraTiles) {
+            try {
                 const tileResults = await processTile(tile);
-                // Send the results back to the main thread after processing each tile
                 self.postMessage({ results: tileResults });
             } catch (error) {
-                console.error('Error processing tile:', error);
-                // Send an error message back to the main thread
+                console.log(error);
                 self.postMessage({ error: 'Error processing tile', tile });
             }
         }
     }
 
-    // Check if event.model exists and update the model name
     if (event.data.model) {
         self.postMessage({ ready: false });
-        model = await loadModel(event.data.model);
+        await loadModel(event.data.model);
         type = event.data.type;
         self.postMessage({ ready: true });
     }
 
-    // if we get a event.data.url we can update the window.location.href
-    if (event.data.url) {
+    if (event.data.url) { // initialize base_dir
         base_dir = event.data.url;
-    };
+    }
 };
 
-/**
- * Preprocess image / frame before forwarded into the model
- * @param {HTMLVideoElement|HTMLImageElement} source
- * @param {Number} modelWidth
- * @param {Number} modelHeight
- * @returns input tensor, xRatio and yRatio
- */
 const preprocess = (source, modelWidth, modelHeight) => {
-
-    const input = tf.tidy(() => {
+    return tf.tidy(() => {
         const img = tf.browser.fromPixels(source);
-
-        // padding image to square => [n, m] to [n, n], n > m
-        const [h, w] = img.shape.slice(0, 2); // get source width and height
-        const maxSize = Math.max(w, h); // get max size
+        const [h, w] = img.shape.slice(0, 2);
+        const maxSize = Math.max(w, h);
         const imgPadded = img.pad([
-            [0, maxSize - h], // padding y [bottom only]
-            [0, maxSize - w], // padding x [right only]
-            [0, 0],
+            [0, maxSize - h],
+            [0, maxSize - w],
+            [0, 0]
         ]);
 
-        return tf.image
-            .resizeBilinear(imgPadded, [modelWidth, modelHeight]) // resize frame
-            .div(255.0) // normalize
-            .expandDims(0); // add batch
+        return [
+            tf.image
+                .resizeBilinear(imgPadded, [modelWidth, modelHeight])
+                .div(255.0)
+                .expandDims(0)
+        ];
     });
-
-    return [input];
 };
 
-/**
- * Function run inference and do detection from source.
- * @param {HTMLImageElement|HTMLVideoElement} source
- * @param {tf.GraphModel} model loaded YOLOv8 tensorflow.js model
- */
 export const detect = async (source, model) => {
-
-    tf.engine().startScope(); // start scoping tf engine
-    const [input] = preprocess(source, 640, 640); // preprocess image
-
-    const res = model.predict(input); // inference model
-    // console.log(res.shape);
-
-    const transRes = res.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
-    // console.log(transRes.shape);
-    // console.log(transRes.arraySync()[0][0].slice(0, 4)); // [x, y, w, h, class_scores]
+    tf.engine().startScope();
+    const [input] = preprocess(source, 640, 640);
+    const res = model.predict(input);
+    const transRes = res.transpose([0, 2, 1]);
 
     const boxes = tf.tidy(() => {
-        const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
-        const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
-        const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
-        const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
-        const x2 = tf.add(x1, w); // x2
-        const y2 = tf.add(y1, h); // y2
-        const boxes = tf.concat([y1, x1, y2, x2], 2).squeeze();
-        return boxes;
+        const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
+        const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
+        const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2));
+        const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2));
+        const x2 = tf.add(x1, w);
+        const y2 = tf.add(y1, h);
+        return tf.concat([y1, x1, y2, x2], 2).squeeze();
     });
 
     const [scores, classes] = tf.tidy(() => {
-        // class scores
-        const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
+        const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0);
         return [rawScores.max(1), rawScores.argMax(1)];
-    }); // get max scores and classes index
+    });
 
-    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD); // NMS to filter boxes
-    // console.log(nms.dataSync());
-
-    const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
-    const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
-    const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
-    // console.log(boxes_data, scores_data, classes_data);
+    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
+    const boxes_data = boxes.gather(nms, 0).dataSync();
+    const scores_data = scores.gather(nms, 0).dataSync();
+    const classes_data = classes.gather(nms, 0).dataSync();
 
     return [boxes_data, scores_data, classes_data];
 };
 
-/**
- * Function run inference and do detection from source.
- * @param {HTMLImageElement|HTMLVideoElement} source
- * @param {tf.GraphModel} model loaded YOLOv8 tensorflow.js model
- */
-export const detect_obb = async (source, model) => {
+export const detectOBB = async (source, model) => {
+    tf.engine().startScope();
+    const [input] = preprocess(source, 640, 640);
+    const res = model.predict(input);
+    const transRes = res.transpose([0, 2, 1]);
 
-    tf.engine().startScope(); // start scoping tf engine
-    const [input] = preprocess(source, 640, 640); // preprocess image
-
-    const res = model.predict(input); // inference model
-    // console.log(res.shape);
-
-    const transRes = res.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
-    // console.log(transRes.shape);
-    // console.log(transRes.arraySync()[0][0].slice(0, 4)); // [x, y, w, h, class_scores]
-
-    const boxes = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
-        const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
-        const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
-        const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
-        const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
-        const x2 = tf.add(x1, w); // x2
-        const y2 = tf.add(y1, h); // y2
-        const rotation = transRes.slice([0, 0, transRes.shape[2] - 1], [-1, -1, 1]); // rotation, between -π/2 to π/2 radians 
-        const boxes = tf.concat([y1, x1, y2, x2, rotation], 2).squeeze(); // y1 x1 y2 x2 rotation
-        return boxes;
+    const boxes = tf.tidy(() => {
+        const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
+        const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
+        const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2));
+        const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2));
+        const x2 = tf.add(x1, w);
+        const y2 = tf.add(y1, h);
+        const rotation = transRes.slice([0, 0, transRes.shape[2] - 1], [-1, -1, 1]);
+        return tf.concat([y1, x1, y2, x2, rotation], 2).squeeze();
     });
 
-    // console.log(boxes.shape); // [8400,5]
-
     const [scores, classes] = tf.tidy(() => {
-        // class scores
-        const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
+        const rawScores = transRes.slice([0, 0, 5], [-1, -1, numClass]).squeeze(0);
         return [rawScores.max(1), rawScores.argMax(1)];
-    }); // get max scores and classes index
+    });
 
-    // grab the first 4 columns of boxes () exlcuding the rotation for nms, go from [8400, 5] to [8400, 4]
-    const boxesForNMS = boxes.slice([0, 0], [-1, 4]);
-
-    // nms
-    const nms = await tf.image.nonMaxSuppressionAsync(boxesForNMS, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD); // NMS to filter boxes
-    // console.log(nms.dataSync());
-
-    const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
-    const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
-    const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
-    // console.log(boxes_data, scores_data, classes_data);
+    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
+    const boxes_data = boxes.gather(nms, 0).dataSync();
+    const scores_data = scores.gather(nms, 0).dataSync();
+    const classes_data = classes.gather(nms, 0).dataSync();
 
     return [boxes_data, scores_data, classes_data];
 };
-
-function tileZXYToLatLon(x, y, zoomLevel) {
-    // EPSG:3857
-    const z = Math.trunc(zoomLevel);
-    const maxXY = (1 << z) - 1;
-    if (x < 0 || x > maxXY || y < 0 || y > maxXY) {
-        throw new Error(`Tile coordinates are out of range [0,${maxXY}]`);
-    }
-    const lon = (x / (1 << z)) * 360 - 180;
-    const n = Math.PI - (2 * Math.PI * y) / (1 << z);
-    const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
-    return { lat, lon };
-}
-
-export function imageCord2WorldCords(img_x, img_y, tile_x, tile_y, zoom) {
-    // Get the starting coordinates of the tile
-    const startingCoords = tileZXYToLatLon(tile_x, tile_y, zoom);
-    const img_size = 640; // size of the image
-
-    // Each tile is a part of the world map
-    const worldSize = Math.pow(2, zoom); // total size of the map at the current zoom level
-    const lat_deg_per_pixel = 180 / worldSize;
-    const lon_deg_per_pixel = 360 / worldSize;
-
-    const lon_deg = startingCoords.lon + (img_x / img_size) * lon_deg_per_pixel;
-    const lat_deg = startingCoords.lat - (img_y / img_size) * lat_deg_per_pixel;
-
-    return [lat_deg, lon_deg];
-}
-
-// Function to calculate the 4 corners of the rotated bounding box
-function getCorners(x_center, y_center, width, height, radians) {
-    // angle goes from -pi/2 to pi/2 with 0 being the horizontal axis in radians
-    const cos = Math.cos(radians);
-    const sin = Math.sin(radians);
-
-    // Half dimensions
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-
-    // Corners relative to the center
-    const corners = [
-        [-halfWidth, -halfHeight],
-        [halfWidth, -halfHeight],
-        [halfWidth, halfHeight],
-        [-halfWidth, halfHeight]
-    ];
-
-    // Calculate rotated corners
-    return corners.map(([dx, dy]) => {
-        const x = x_center + dx * cos - dy * sin;
-        const y = y_center + dx * sin + dy * cos;
-        return [x, y];
-    });
-}

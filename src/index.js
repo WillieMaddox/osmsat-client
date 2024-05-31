@@ -13,7 +13,7 @@ import { createStringXY, toStringHDMS } from 'ol/coordinate';
 import { LineString, Point, Polygon } from 'ol/geom';
 import { ATTRIBUTION } from 'ol/source/OSM'
 import LayerGroup from 'ol/layer/Group';
-import { containsCoordinate, getCenter } from 'ol/extent';
+import { getCenter } from 'ol/extent';
 import { transform } from 'ol/proj';
 import { Feature } from 'ol';
 import View from 'ol/View';
@@ -26,54 +26,12 @@ import Toggle from 'ol-ext/control/Toggle';
 import Swipe from 'ol-ext/control/Swipe';
 import Bar from 'ol-ext/control/Bar';
 
-import { randomColor, meter2pixel, meter2tile, formatLength, formatArea } from './utils';
+import { randomColor, coordinateFormatPIXEL, coordinateFormatTILE, formatLength, formatArea } from './utils';
 import { style, labelStyle, tipStyle, modifyStyle, polygonStyleFunction } from './utils';
+import { segmentStyle, segmentStyles, deg2tile } from './utils';
 
-let zoom = 19, center = [-110.832245, 32.155011];
-// let zoom = 19, center = [-110.869236, 32.140271];
-
-function coordinateFormatPIXEL(coord) {
-    let zoom = view.getZoom()
-    let xypixel = meter2pixel(coord[0], coord[1], zoom)
-    let x = 'X: ' + xypixel[0]
-    let y = 'Y: ' + xypixel[1]
-    return [x, y].join('   ')
-}
-function coordinateFormatTILE(coord) {
-    let zoom = view.getZoom()
-    let xytile = meter2tile(coord[0], coord[1], zoom)
-    let x = 'X: ' + xytile[0]
-    let y = 'Y: ' + xytile[1]
-    let z = 'Z: ' + xytile[2]
-    let c = 'C: ' + xytile[3]
-    let r = 'R: ' + xytile[4]
-    return [z, x, y, c, r].join('   ')
-}
-
-const segmentStyle = new Style({
-    text: new Text({
-        font: '12px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
-        padding: [2, 2, 2, 2],
-        textBaseline: 'bottom',
-        offsetY: -12,
-    }),
-    image: new RegularShape({
-        radius: 6,
-        points: 3,
-        angle: Math.PI,
-        displacement: [0, 8],
-        fill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
-    }),
-});
-const segmentStyles = [segmentStyle];
+let zoom = 16, center = [-110.832245, 32.155011];
+let bboxList = [];
 
 let thunderforestAttributions = [
     'Tiles &copy; <a href="https://www.thunderforest.com/">Thunderforest</a>',
@@ -273,14 +231,14 @@ let controls = [
     }),
     new MousePosition({
         coordinateFormat: function (coord) {
-            return 'PIXEL: ' + coordinateFormatPIXEL(coord);
+            return 'PIXEL: ' + coordinateFormatPIXEL(view, coord);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionPIXEL',
         projection: 'EPSG:900913',
     }),
     new MousePosition({
         coordinateFormat: function (coord) {
-            return 'TILE: ' + coordinateFormatTILE(coord);
+            return 'TILE: ' + coordinateFormatTILE(view, coord);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionTILE',
         projection: 'EPSG:900913',
@@ -559,6 +517,7 @@ bboxToggle.on('change:active', function (e) {
     bboxLayer.getSource().clear();
     bboxInteraction.setActive(e.active);
     bboxLayer.setVisible(e.active);
+    if (!e.active) bboxList = []; // reset the bbox list if we turn off the toggle
     measureDisplayElement.style.display = e.active ? '' : 'none';
 })
 mainbar.addControl(bboxToggle);
@@ -581,8 +540,17 @@ bboxInteraction.on('drawing', function (e) {
     ll0 = createStringXY(6)([lon0, lat0])
     ll1 = createStringXY(6)([lon1, lat1])
     document.getElementById('bbox').value = ll0 + ', ' + ll1;
+    map.getTargetElement().style.cursor = 'crosshair'; // better than drawstart
 });
 
+bboxInteraction.on('drawend', function (e) {
+    let bbox = document.getElementById('bbox').value.split(',').map(parseFloat);
+    bboxList.push(bbox);
+    if (predictButton.getActive()) {
+        runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+    }
+    map.getTargetElement().style.cursor = '';
+});
 
 const typeSelect = document.getElementById('type');
 const showSegments = document.getElementById('segments');
@@ -720,7 +688,7 @@ showSegments.onchange = function () {
 };
 
 // makeing a vector layer for detections
-const geojsonSource = new VectorSource();
+export const geojsonSource = new VectorSource();
 const geojsonLayer = new VectorLayer({
     source: geojsonSource,
     title: "Detections",
@@ -733,39 +701,116 @@ map.addLayer(geojsonLayer);
 rightgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
 leftgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
 
-// YOLO predict code
-const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
-tfjs_worker.postMessage({ url: document.URL });
-const processedTiles = new Set();
-
-// run when map has stopped moving
-// Utility function to debounce a function
-function debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-        const context = this;
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(context, args), wait);
-    };
-}
-const debouncedRunModelOnTiles = debounce(runModelOnTiles, 1000); // Adjust the debounce delay as needed
-map.on('moveend', function () {
-    if (predictButton.getActive()) {
-        debouncedRunModelOnTiles();
+const predictButton = new Toggle({
+    title: "Predict",
+    className: "predict-button",
+    html: '<svg id="star" width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
+    active: false,
+    onToggle: function (active) {
+        if (active) {
+            runModelOnBoxes();
+        }
+        modelElement.style.display = active ? 'flex' : 'none';
     }
 });
+mainbar.addControl(predictButton);
 
+// create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'd') {
+        let debugElement = document.querySelectorAll('button[type=button][title="Tiling Grid"]')[0];
+        debugElement.click();
+    } else if (event.key === 'p') {
+        let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
+        predictElement.click();
+    } else if (event.key === 'm') {
+        let measureElement = document.querySelectorAll('button[type=button][title="Measure"]')[0];
+        measureElement.click();
+    } else if (event.key === 'b') {
+        let bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
+        bboxElement.click();
+    }
+    else if (event.key === 'h') {
+        const modelElement = document.getElementById('modelInfoElement');
+        modelElement.style.display = modelElement.style.display === 'none' ? 'flex' : 'none';
+    }
+}, { passive: true });
 
-async function runModelOnTiles() {
-    const resources = performance.getEntriesByType('resource');
-    const imageResources = resources.filter(resource => resource.initiatorType === 'img');
-    const imagePaths = imageResources.map(resource => resource.name);
-    const googlePaths = imagePaths.filter(path => path.includes('google'));
-    const googleTiles = googlePaths.filter(path => path.endsWith('z=19'));
-    const tilesToProcess = googleTiles.filter(tile => !processedTiles.has(tile));
-    tfjs_worker.postMessage({ tiles: tilesToProcess });
-    tilesToProcess.forEach(tile => processedTiles.add(tile));
+// copy to clipboard function
+function copyToClipboard() {
+    const copyText = document.getElementById('bbox');
+    copyText.select();
+    copyText.setSelectionRange(0, 99999); /*For mobile devices*/
+    document.execCommand('copy');
 }
+const copyButton = document.getElementById('CopyToClipboard');
+copyButton.addEventListener('click', copyToClipboard, { passive: true });
+
+
+// information buttton
+const howToUse = document.getElementById('HowToUse');
+const infoPanel = document.getElementById('infoPanel');
+const howToIcon = document.getElementById('HowToIcon');
+howToIcon.addEventListener('click', () => {
+    infoPanel.style.display = infoPanel.style.display === 'none' ? 'block' : 'none';
+    // make the background blue when the info panel is open
+    if (infoPanel.style.display === 'block') {
+        howToUse.style.backgroundColor = '#00AAFF';
+        howToIcon.style.color = 'white';
+    } else {
+        howToUse.style.backgroundColor = 'white';
+        howToIcon.style.color = 'black';
+    }
+}, { passive: true });
+
+// model
+const modelElement = document.getElementById('modelInfoElement');
+const modelLoading = document.getElementById('loadModel');
+const modelName = document.getElementById('modelName');
+const modelType = document.getElementById('modelType');
+
+function get_tiles_from_cord_box(box) {
+    let [x0, y0, z] = deg2tile(box[0], box[1], 19);
+    let [x1, y1, _] = deg2tile(box[2], box[3], 19);
+
+    // Collect all tiles within the bounding box
+    let tiles = [];
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+            tiles.push({ x, y, z });
+        }
+    }
+    return tiles;
+}
+
+
+// buttons for search function
+document.addEventListener('DOMContentLoaded', function () {
+    // add a svg icon to the element Button with title="Search"
+    let searchElement = document.querySelector('.ol-search button[title="Search"]');
+    searchElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+    searchElement.style.margin = "2px 1px"
+    // add a svg icon to the element Button with title="ol-revers"
+    let reverseElement = document.querySelector('.ol-search button[title="click on the map"]');
+    reverseElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M0.900024 7.50002C0.900024 3.85495 3.85495 0.900024 7.50002 0.900024C11.1451 0.900024 14.1 3.85495 14.1 7.50002C14.1 11.1451 11.1451 14.1 7.50002 14.1C3.85495 14.1 0.900024 11.1451 0.900024 7.50002ZM7.50002 1.80002C4.35201 1.80002 1.80002 4.35201 1.80002 7.50002C1.80002 10.648 4.35201 13.2 7.50002 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.35201 10.648 1.80002 7.50002 1.80002ZM3.07504 7.50002C3.07504 5.05617 5.05618 3.07502 7.50004 3.07502C9.94388 3.07502 11.925 5.05617 11.925 7.50002C11.925 9.94386 9.94388 11.925 7.50004 11.925C5.05618 11.925 3.07504 9.94386 3.07504 7.50002ZM7.50004 3.92502C5.52562 3.92502 3.92504 5.52561 3.92504 7.50002C3.92504 9.47442 5.52563 11.075 7.50004 11.075C9.47444 11.075 11.075 9.47442 11.075 7.50002C11.075 5.52561 9.47444 3.92502 7.50004 3.92502ZM7.50004 5.25002C6.2574 5.25002 5.25004 6.25739 5.25004 7.50002C5.25004 8.74266 6.2574 9.75002 7.50004 9.75002C8.74267 9.75002 9.75004 8.74266 9.75004 7.50002C9.75004 6.25738 8.74267 5.25002 7.50004 5.25002ZM6.05004 7.50002C6.05004 6.69921 6.69923 6.05002 7.50004 6.05002C8.30084 6.05002 8.95004 6.69921 8.95004 7.50002C8.95004 8.30083 8.30084 8.95002 7.50004 8.95002C6.69923 8.95002 6.05004 8.30083 6.05004 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+    reverseElement.style.margin = "2px 1px"
+    // add word to button layer switcher left
+    let left_switch = document.querySelector('.layerSwitcherLeft button');
+    left_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+    // add word to button layer switcher right
+    let right_switch = document.querySelector('.layerSwitcherRight button');
+    right_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
+
+    // load model when DOM loaded
+    tfjs_worker.postMessage({ model: "yolob8s_allplanes_class_89_hbb_web_model", type: "hbb" });
+}, { passive: true });
+
+// In the current implementation of LayerSwitcher layers don't overlap, so we turn off opacity.
+document.body.classList.add('hideOpacity')
+
+// connect worker
+const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
+tfjs_worker.postMessage({ url: document.URL });
 
 // Listen for messages from the worker
 let modelLoadingStatusElement = document.getElementById('modelLoading');
@@ -808,112 +853,21 @@ tfjs_worker.onmessage = function (event) {
     // Handle errors
     if (error) {
         console.error('Error:', error);
-        // Add error handling logic as needed
     }
 };
 
-const modelElement = document.getElementById('modelInfoElement');
-const modelLoading = document.getElementById('loadModel');
-const modelName = document.getElementById('modelName');
-const modelType = document.getElementById('modelType');
-
+// change model
 modelLoading.onclick = function () {
     const model = modelName.value;
     const type = modelType.value;
     tfjs_worker.postMessage({ model, type });
 };
 
-const predictButton = new Toggle({
-    title: "Predict",
-    className: "predict-button",
-    html: '<svg id="star" width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>',
-    active: false,
-    onToggle: function (active) {
-        if (active) {
-            runModelOnTiles();
-        }
-        modelElement.style.display = active ? 'flex' : 'none';
-    }
-});
-mainbar.addControl(predictButton);
-
-// Set up the PerformanceObserver to observe resource entries
-const observer = new PerformanceObserver((list) => {
-    if (predictButton.getActive()) {
-        runModelOnTiles();
-    }
-});
-// observer.observe({ entryTypes: ['resource'] });
-
-
-// create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
-document.addEventListener('keydown', function (event) {
-    if (event.key === 'd') {
-        let debugElement = document.querySelectorAll('button[type=button][title="Tiling Grid"]')[0];
-        debugElement.click();
-    } else if (event.key === 'p') {
-        let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
-        predictElement.click();
-    } else if (event.key === 'm') {
-        let measureElement = document.querySelectorAll('button[type=button][title="Measure"]')[0];
-        measureElement.click();
-    } else if (event.key === 'b') {
-        let bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
-        bboxElement.click();
-    }
-    else if (event.key === 'h') {
-        const modelElement = document.getElementById('modelInfoElement');
-        modelElement.style.display = modelElement.style.display === 'none' ? 'flex' : 'none';
-    }
-});
-
-// copy to clipboard function
-function copyToClipboard() {
-    const copyText = document.getElementById('bbox');
-    copyText.select();
-    copyText.setSelectionRange(0, 99999); /*For mobile devices*/
-    document.execCommand('copy');
+// run model
+function runModelOnBoxes() {
+    // bboxList [-110.833772, 32.153293, -110.826272, 32.159119], ...
+    let tiles = bboxList.map(get_tiles_from_cord_box).flat();
+    tfjs_worker.postMessage({ tiles: tiles });
+    bboxList = [];
 }
-const copyButton = document.getElementById('CopyToClipboard');
-copyButton.addEventListener('click', copyToClipboard);
 
-
-// information buttton
-const howToUse = document.getElementById('HowToUse');
-const infoPanel = document.getElementById('infoPanel');
-const howToIcon = document.getElementById('HowToIcon');
-howToIcon.addEventListener('click', () => {
-    infoPanel.style.display = infoPanel.style.display === 'none' ? 'block' : 'none';
-    // make the background blue when the info panel is open
-    if (infoPanel.style.display === 'block') {
-        howToUse.style.backgroundColor = '#00AAFF';
-        howToIcon.style.color = 'white';
-    } else {
-        howToUse.style.backgroundColor = 'white';
-        howToIcon.style.color = 'black';
-    }
-});
-
-// buttons for search function
-document.addEventListener('DOMContentLoaded', function () {
-    // add a svg icon to the element Button with title="Search"
-    let searchElement = document.querySelector('.ol-search button[title="Search"]');
-    searchElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-    searchElement.style.margin = "2px 1px"
-    // add a svg icon to the element Button with title="ol-revers"
-    let reverseElement = document.querySelector('.ol-search button[title="click on the map"]');
-    reverseElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M0.900024 7.50002C0.900024 3.85495 3.85495 0.900024 7.50002 0.900024C11.1451 0.900024 14.1 3.85495 14.1 7.50002C14.1 11.1451 11.1451 14.1 7.50002 14.1C3.85495 14.1 0.900024 11.1451 0.900024 7.50002ZM7.50002 1.80002C4.35201 1.80002 1.80002 4.35201 1.80002 7.50002C1.80002 10.648 4.35201 13.2 7.50002 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.35201 10.648 1.80002 7.50002 1.80002ZM3.07504 7.50002C3.07504 5.05617 5.05618 3.07502 7.50004 3.07502C9.94388 3.07502 11.925 5.05617 11.925 7.50002C11.925 9.94386 9.94388 11.925 7.50004 11.925C5.05618 11.925 3.07504 9.94386 3.07504 7.50002ZM7.50004 3.92502C5.52562 3.92502 3.92504 5.52561 3.92504 7.50002C3.92504 9.47442 5.52563 11.075 7.50004 11.075C9.47444 11.075 11.075 9.47442 11.075 7.50002C11.075 5.52561 9.47444 3.92502 7.50004 3.92502ZM7.50004 5.25002C6.2574 5.25002 5.25004 6.25739 5.25004 7.50002C5.25004 8.74266 6.2574 9.75002 7.50004 9.75002C8.74267 9.75002 9.75004 8.74266 9.75004 7.50002C9.75004 6.25738 8.74267 5.25002 7.50004 5.25002ZM6.05004 7.50002C6.05004 6.69921 6.69923 6.05002 7.50004 6.05002C8.30084 6.05002 8.95004 6.69921 8.95004 7.50002C8.95004 8.30083 8.30084 8.95002 7.50004 8.95002C6.69923 8.95002 6.05004 8.30083 6.05004 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-    reverseElement.style.margin = "2px 1px"
-    // add word to button layer switcher left
-    let left_switch = document.querySelector('.layerSwitcherLeft button');
-    left_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-    // add word to button layer switcher right
-    let right_switch = document.querySelector('.layerSwitcherRight button');
-    right_switch.innerHTML = '<svg width="2.5rem" height="2.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M7.75432 0.819537C7.59742 0.726821 7.4025 0.726821 7.24559 0.819537L1.74559 4.06954C1.59336 4.15949 1.49996 4.32317 1.49996 4.5C1.49996 4.67683 1.59336 4.84051 1.74559 4.93046L7.24559 8.18046C7.4025 8.27318 7.59742 8.27318 7.75432 8.18046L13.2543 4.93046C13.4066 4.84051 13.5 4.67683 13.5 4.5C13.5 4.32317 13.4066 4.15949 13.2543 4.06954L7.75432 0.819537ZM7.49996 7.16923L2.9828 4.5L7.49996 1.83077L12.0171 4.5L7.49996 7.16923ZM1.5695 7.49564C1.70998 7.2579 2.01659 7.17906 2.25432 7.31954L7.49996 10.4192L12.7456 7.31954C12.9833 7.17906 13.2899 7.2579 13.4304 7.49564C13.5709 7.73337 13.4921 8.03998 13.2543 8.18046L7.75432 11.4305C7.59742 11.5232 7.4025 11.5232 7.24559 11.4305L1.74559 8.18046C1.50786 8.03998 1.42901 7.73337 1.5695 7.49564ZM1.56949 10.4956C1.70998 10.2579 2.01658 10.1791 2.25432 10.3195L7.49996 13.4192L12.7456 10.3195C12.9833 10.1791 13.2899 10.2579 13.4304 10.4956C13.5709 10.7334 13.4921 11.04 13.2543 11.1805L7.75432 14.4305C7.59742 14.5232 7.4025 14.5232 7.24559 14.4305L1.74559 11.1805C1.50785 11.04 1.42901 10.7334 1.56949 10.4956Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-
-    // load model when DOM loaded
-    tfjs_worker.postMessage({ model: "yolob8s_allplanes_class_89_hbb_web_model", type: "hbb" });
-});
-
-// In the current implementation of LayerSwitcher layers don't overlap, so we turn off opacity.
-document.body.classList.add('hideOpacity')
