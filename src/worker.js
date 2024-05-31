@@ -65,8 +65,10 @@ async function processTile(tile, isCombo = false) {
 
     // get image data of the combines tile or a single tile
     let imageData;
+    let size = 640;
     if (isCombo) {
         imageData = await combineImages(tile);
+        size = 320; // double the scaling when converting 4 tiles to 1
     } else {
         const { x, y, z } = tile;
         const url = genGoogleUrl(x, y, z);
@@ -82,10 +84,10 @@ async function processTile(tile, isCombo = false) {
         [boxes, scores, classes] = await detectOBB(imageData, model);
     }
 
-    return convertDetections(boxes, scores, classes, tile);
+    return convertDetections(boxes, scores, classes, tile, size);
 }
 
-function convertDetections(boxes, scores, classes, tile) {
+function convertDetections(boxes, scores, classes, tile, size = 640) {
     const { x: x_tile, y: y_tile, z: zoom } = Array.isArray(tile) ? tile[0] : tile;
     const boxesArray = Array.from(boxes);
     const scoresArray = Array.from(scores);
@@ -100,7 +102,7 @@ function convertDetections(boxes, scores, classes, tile) {
         const height = y2 - y1;
         const corners = getCorners(x_center, y_center, width, height, angle || 0);
         // console.log({ box: box, corners: corners, info: [x_center, y_center, width, height], class: classIndex });
-        const worldCorners = corners.map(([x, y]) => tilePixelToWorld(x, y, 640, x_tile, y_tile, zoom));
+        const worldCorners = corners.map(([x, y]) => tilePixelToWorld(x, y, size, x_tile, y_tile, zoom));
         return {
             corners: worldCorners,
             score: scoresArray[i],
@@ -143,9 +145,7 @@ function checkAdjacentTiles(tiles) {
 self.onmessage = async function (event) {
     if (event.data.tiles) {
         const tiles = Object.values(event.data.tiles);
-        // const { combos, extraTiles } = checkAdjacentTiles(tiles);
-        const combos = [];
-        const extraTiles = tiles;
+        const { combos, extraTiles } = checkAdjacentTiles(tiles);
 
         for (const combo of combos) {
             try {
