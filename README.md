@@ -10,7 +10,7 @@ This tool allows you to perform various actions on the map:
 ### Layers
 
 - Base Layers: Choose between base layers like OpenStreetMap, Google Maps, and Bing Maps.
-- Vector Layer: View various overlays on the map like detections or other annotations.
+- Vector Layer: View various overlays on the map like detections or markers.
 
 ### Interactions
 
@@ -22,11 +22,14 @@ This tool allows you to perform various actions on the map:
 
 ### Keyboard Shortcuts
 
-- **d**: Toggles the visibility of the grid tiles 👁️
-- **b**: Toggles the bounding box drawing mode ✏️
-- **p**: Toggles the object detection prediction mode 💡
-- **m**: Toggles the distance measurement mode 📏
-- **h**: Toggle the model info panel 📊
+- **d**: Toggles the visibility of the grid tiles.
+- **p**: Toggles the object detection prediction mode.
+- **m**: Toggles the measurement mode.
+- **b**: Toggles the bounding box drawing mode.
+- **l**: Toggles the model info panel.
+- **q**: Sends a single tile to the worker for debugging. The tile coordinates are `{ x: 100732, y: 212643, z: 19 }`.
+- **c**: Clears the detection layer predictions.
+- **h**: Hides or shows all controls and overlays, including the "How To Use" panel.
 
 ## Starting the Web Application
 
