@@ -1,13 +1,16 @@
 import { Fill, Stroke, Style, Text, RegularShape, Circle as CircleStyle } from 'ol/style';
 import { getArea, getLength } from 'ol/sphere';
-import labels from './labels.json';
 
 // Constants
-const numClass = labels.length;
 const maxResolution = 2400;
 
-// Generate numClass random colors
-const colors = Array.from({ length: numClass }, () => randomColor(0.2));
+// Labels
+let labels = [];
+let colors = [];
+export function updateLabels(newLabels) {
+    labels = newLabels;
+    colors = Array.from({ length: labels.length }, () => randomColor(0.2));
+}
 
 // Function to create text style
 const createTextStyle = (feature, resolution) => {

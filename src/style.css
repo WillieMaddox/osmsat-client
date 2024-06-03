@@ -53,6 +53,13 @@ body {
     }
 }
 
+#modelInfoElement {
+    display: none;
+    padding: 5px 0px;
+    justify-content: space-around;
+    width: 95%;
+}
+
 .ol-control.ol-layerswitcher .panel-container {
     border-radius: 5px;
 }

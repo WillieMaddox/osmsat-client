@@ -1,22 +1,54 @@
 import { getCorners, tilePixelToWorld } from './utils.js';
 import * as tf from '@tensorflow/tfjs';
-import labels from "./labels.json";
 
 let base_dir = null;
+let numClass = null;
+let labels = null;
 let model = null;
 let type = null;
-const numClass = labels.length;
 const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
 async function loadModel(MODEL_NAME) {
+    // load model
     const MODEL_URL = `${base_dir}/models/${MODEL_NAME}/model.json`;
     model = await tf.loadGraphModel(MODEL_URL);
     const dummyInput = tf.ones(model.inputs[0].shape);
     const warmupResults = model.predict(dummyInput);
     tf.dispose([warmupResults, dummyInput]);
     self.postMessage({ ready: true });
+    // Also load the labels
+    const CLASSES_URL = `${base_dir}/models/${MODEL_NAME}/metadata.yaml`;
+    const response = await fetch(CLASSES_URL);
+    const classesText = await response.text();
+    labels = getClassNames(classesText);
+    numClass = labels.length;
+    console.log(`${MODEL_NAME} model loaded with ${numClass} classes`);
+    self.postMessage({ labels: labels });
 }
+
+function getClassNames(fileContent) {
+    const lines = fileContent.split('\n');
+    const names = [];
+    let isNamesSection = false;
+    for (let line of lines) {
+        if (line.trim() === 'names:') {
+            isNamesSection = true;
+            continue;
+        }
+        if (isNamesSection) {
+            line = line.trim();
+            const match = line.match(/^\s*\d+:\s*(.+)$/);
+            if (match) {
+                names.push(match[1]);
+            } else if (line === '') {
+                break; // Terminate the section on an empty line
+            }
+        }
+    }
+    return names;
+}
+
 
 function genGoogleUrl(x, y, z) {
     const randomSuffix = Math.floor(Math.random() * 4);

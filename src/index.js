@@ -27,7 +27,7 @@ import Swipe from 'ol-ext/control/Swipe';
 import Bar from 'ol-ext/control/Bar';
 
 import { randomColor, coordinateFormatPIXEL, coordinateFormatTILE, formatLength, formatArea } from './utils';
-import { style, labelStyle, tipStyle, modifyStyle, polygonStyleFunction } from './utils';
+import { style, labelStyle, tipStyle, modifyStyle, polygonStyleFunction, updateLabels } from './utils';
 import { segmentStyle, segmentStyles, deg2tile } from './utils';
 
 let zoom = 16, center = [-110.832245, 32.155011];
@@ -731,11 +731,22 @@ document.addEventListener('keydown', function (event) {
         measureElement.click();
     } else if (event.key === 'b') {
         bboxElement.click();
-    } else if (event.key === 'h') {
-        modelElement.style.display = modelElement.style.display === 'none' ? 'flex' : 'none';
+    } else if (event.key === 'l') {
+        modelElement.style.display = modelElement.style.display === 'flex' ? 'none' : 'flex';
     } else if (event.key === 'q') { // debug shortcut to send a single tile to the worker
         tfjs_worker.postMessage({ debugTile: { x: 100732, y: 212643, z: 19 } });
+    } else if (event.key === 'c') { // clear the detection layer predictions
+        geojsonSource.clear();
+    } else if (event.key === 'h') { // hide everything but the map
+        const controls = document.getElementsByClassName('ol-control');
+        for (let i = 0; i < controls.length; i++) {
+            controls[i].style.display = controls[i].style.display === 'none' ? '' : 'none';
+        }
+        document.getElementsByClassName('ol-overlaycontainer')[0].style.display = document.getElementsByClassName('ol-overlaycontainer')[0].style.display === 'none' ? '' : 'none';
+        document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display = document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display === 'none' ? '' : 'none';
+        document.getElementById('HowToUse').style.display = document.getElementById('HowToUse').style.display === 'none' ? '' : 'none';
     }
+
 }, { passive: true });
 
 // copy to clipboard function
@@ -817,13 +828,13 @@ tfjs_worker.postMessage({ url: document.URL });
 // Listen for messages from the worker
 let modelLoadingStatusElement = document.getElementById('modelLoading');
 tfjs_worker.onmessage = function (event) {
-    const { ready, results, error } = event.data;
+    const { ready, results, labels, error } = event.data;
 
     // Check if the message indicates that the model is ready
     if (ready === true) {
         let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
         predictElement.innerHTML = '<svg width="1.5rem" height="1.5rem" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2280/svg"><path d="M13.9 0.499976C13.9 0.279062 13.7209 0.0999756 13.5 0.0999756C13.2791 0.0999756 13.1 0.279062 13.1 0.499976V1.09998H12.5C12.2791 1.09998 12.1 1.27906 12.1 1.49998C12.1 1.72089 12.2791 1.89998 12.5 1.89998H13.1V2.49998C13.1 2.72089 13.2791 2.89998 13.5 2.89998C13.7209 2.89998 13.9 2.72089 13.9 2.49998V1.89998H14.5C14.7209 1.89998 14.9 1.72089 14.9 1.49998C14.9 1.27906 14.7209 1.09998 14.5 1.09998H13.9V0.499976ZM11.8536 3.14642C12.0488 3.34168 12.0488 3.65826 11.8536 3.85353L10.8536 4.85353C10.6583 5.04879 10.3417 5.04879 10.1465 4.85353C9.9512 4.65827 9.9512 4.34169 10.1465 4.14642L11.1464 3.14643C11.3417 2.95116 11.6583 2.95116 11.8536 3.14642ZM9.85357 5.14642C10.0488 5.34168 10.0488 5.65827 9.85357 5.85353L2.85355 12.8535C2.65829 13.0488 2.34171 13.0488 2.14645 12.8535C1.95118 12.6583 1.95118 12.3417 2.14645 12.1464L9.14646 5.14642C9.34172 4.95116 9.65831 4.95116 9.85357 5.14642ZM13.5 5.09998C13.7209 5.09998 13.9 5.27906 13.9 5.49998V6.09998H14.5C14.7209 6.09998 14.9 6.27906 14.9 6.49998C14.9 6.72089 14.7209 6.89998 14.5 6.89998H13.9V7.49998C13.9 7.72089 13.7209 7.89998 13.5 7.89998C13.2791 7.89998 13.1 7.72089 13.1 7.49998V6.89998H12.5C12.2791 6.89998 12.1 6.72089 12.1 6.49998C12.1 6.27906 12.2791 6.09998 12.5 6.09998H13.1V5.49998C13.1 5.27906 13.2791 5.09998 13.5 5.09998ZM8.90002 0.499976C8.90002 0.279062 8.72093 0.0999756 8.50002 0.0999756C8.2791 0.0999756 8.10002 0.279062 8.10002 0.499976V1.09998H7.50002C7.2791 1.09998 7.10002 1.27906 7.10002 1.49998C7.10002 1.72089 7.2791 1.89998 7.50002 1.89998H8.10002V2.49998C8.10002 2.72089 8.2791 2.89998 8.50002 2.89998C8.72093 2.89998 8.90002 2.72089 8.90002 2.49998V1.89998H9.50002C9.72093 1.89998 9.90002 1.72089 9.90002 1.49998C9.90002 1.27906 9.72093 1.09998 9.50002 1.09998H8.90002V0.499976Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-        modelLoadingStatusElement.innerHTML = '&nbsp; Model Loaded &nbsp;';
+        modelLoadingStatusElement.innerHTML = '&nbsp; Loaded &nbsp;';
         modelLoadingStatusElement.style.backgroundColor = '#00AAFF';
         return; // Exit the listener function
     }
@@ -832,7 +843,7 @@ tfjs_worker.onmessage = function (event) {
     if (ready === false) {
         let predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
         predictElement.innerHTML = '<svg id="star" width="1.5rem" height="1.5rem" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.486 2 2 6.486 2 12C2 17.514 6.486 22 12 22C17.514 22 22 17.514 22 12C22 6.486 17.514 2 12 2ZM12 20C7.589 20 4 16.411 4 12C4 7.589 7.589 4 12 4C16.411 4 20 7.589 20 12C20 16.411 16.411 20 12 20Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M12 6C8.686 6 6 8.686 6 12C6 15.314 8.686 18 12 18C15.314 18 18 15.314 18 12C18 8.686 15.314 6 12 6ZM12 16C9.243 16 7 13.757 7 11C7 8.243 9.243 6 12 6C14.757 6 17 8.243 17 11C17 13.757 14.757 16 12 16Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>';
-        modelLoadingStatusElement.innerHTML = "&nbsp; Model Loading &nbsp;";
+        modelLoadingStatusElement.innerHTML = "&nbsp; Loading &nbsp;";
         modelLoadingStatusElement.style.backgroundColor = 'rgb(255, 165, 0)';
         return; // Exit the listener function
     }
@@ -850,6 +861,11 @@ tfjs_worker.onmessage = function (event) {
             });
             geojsonSource.addFeature(boxFeature);
         });
+    }
+
+    // Handle the labels if the model is ready
+    if (labels) {
+        updateLabels(labels);
     }
 
     // Handle errors
