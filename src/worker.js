@@ -68,6 +68,8 @@ function getImageData(img) {
     return ctx.getImageData(0, 0, img.width, img.height, { colorSpace: 'srgb' });
 }
 
+
+
 async function combineImages(tiles) {
     const tileImages = await Promise.all(tiles.map(tile => fetchImage(genGoogleUrl(tile.x, tile.y, tile.z))));
     const tileWidth = tileImages[0].width;
@@ -143,11 +145,10 @@ function convertDetections(boxes, scores, classes, tile, size = 640) {
     });
 }
 
-function checkAdjacentTiles(tiles) {
+function checkAdjacentTiles(tiles, duplicates = true) {
+    const combos = [];
     const tileCoords = tiles.map(({ x, y, z }) => ({ x, y, z }));
     const tileSet = new Set(tileCoords.map(({ x, y, z }) => `${x},${y},${z}`));
-
-    const combos = [];
     tileCoords.forEach(({ x, y, z }) => {
         if (
             tileSet.has(`${x},${y},${z}`) &&
@@ -155,22 +156,17 @@ function checkAdjacentTiles(tiles) {
             tileSet.has(`${x},${y + 1},${z}`) &&
             tileSet.has(`${x + 1},${y + 1},${z}`)
         ) {
-            combos.push([
-                { x, y, z },
-                { x: x + 1, y, z },
-                { x, y: y + 1, z },
-                { x: x + 1, y: y + 1, z }
-            ]);
-            tileSet.delete(`${x},${y},${z}`);
-            tileSet.delete(`${x + 1},${y},${z}`);
-            tileSet.delete(`${x},${y + 1},${z}`);
-            tileSet.delete(`${x + 1},${y + 1},${z}`);
+            combos.push([{ x, y, z }, { x: x + 1, y, z }, { x, y: y + 1, z }, { x: x + 1, y: y + 1, z }]);
+            if (!duplicates) {
+                tileSet.delete(`${x},${y},${z}`);
+                tileSet.delete(`${x + 1},${y},${z}`);
+                tileSet.delete(`${x},${y + 1},${z}`);
+                tileSet.delete(`${x + 1},${y + 1},${z}`);
+            }
         }
     });
-
     const comboTilesSet = new Set(combos.flat().map(({ x, y, z }) => `${x},${y},${z}`));
     const extraTiles = tiles.filter(({ x, y, z }) => !comboTilesSet.has(`${x},${y},${z}`));
-
     return { combos, extraTiles };
 }
 
@@ -198,6 +194,9 @@ self.onmessage = async function (event) {
                 self.postMessage({ error: 'Error processing tile', tile });
             }
         }
+
+        // run nms on all the results
+        self.postMessage({ nms: true });
     }
 
     if (event.data.model) {
@@ -211,7 +210,7 @@ self.onmessage = async function (event) {
         base_dir = event.data.url;
     }
 
-    if (event.data.debugTile) { // hardcorded debug tile
+    if (event.data.debugTile) { // debug tile
         const tile = event.data.debugTile;
         const debugResults = await debugTile(tile);
         self.postMessage({ results: debugResults });

@@ -29,6 +29,7 @@ import Bar from 'ol-ext/control/Bar';
 import { randomColor, coordinateFormatPIXEL, coordinateFormatTILE, formatLength, formatArea } from './utils';
 import { style, labelStyle, tipStyle, modifyStyle, polygonStyleFunction, updateLabels } from './utils';
 import { segmentStyle, segmentStyles, deg2tile } from './utils';
+import * as tf from '@tensorflow/tfjs';
 
 let zoom = 16, center = [-110.832245, 32.155011];
 let bboxList = [];
@@ -701,6 +702,58 @@ map.addLayer(geojsonLayer);
 rightgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
 leftgroup.getLayers().getArray()[1].getLayers().push(geojsonLayer);
 
+async function nmsDetections() {
+    // create boxes, scores, and classes from feature values
+    let boxes = [];
+    let scores = [];
+    let classes = [];
+    geojsonSource.getFeatures().forEach((feature) => {
+        const extent = feature.getGeometry().getExtent();
+        boxes.push([extent[0], extent[1], extent[2], extent[3]]);
+        scores.push(feature.get('score'));
+        classes.push(feature.get('classIndex'));
+    });
+
+    // run nms
+    const boxesTensor = tf.tensor2d(boxes, [boxes.length, 4]); // [x, 4]
+    const scoresTensor = tf.tensor1d(scores); // [x]
+    const nmsIndices = await tf.image.nonMaxSuppressionAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .5)
+
+    // gather results
+    const gatheredBoxes = boxesTensor.gather(nmsIndices);
+    const gatheredScores = scoresTensor.gather(nmsIndices);
+    const gatheredClasses = tf.gather(tf.tensor1d(classes, 'int32'), nmsIndices); // int32 for class indices
+
+    const boxesData = await gatheredBoxes.array();
+    const scoresData = await gatheredScores.array();
+    const classesData = await gatheredClasses.array();
+
+    // replace the current features with the nms results
+    geojsonSource.clear();
+    for (let i = 0; i < scoresData.length; i++) {
+        const bbox = boxesData[i];
+        const score = scoresData[i];
+        const cls = classesData[i];
+        const feature = new Feature(new Polygon([[
+            [bbox[0], bbox[1]],
+            [bbox[0], bbox[3]],
+            [bbox[2], bbox[3]],
+            [bbox[2], bbox[1]],
+            [bbox[0], bbox[1]]
+        ]]));
+        feature.setProperties({ score: score, classIndex: cls });
+        geojsonSource.addFeature(feature);
+    }
+
+    // dispose tensors to free memory
+    boxesTensor.dispose();
+    scoresTensor.dispose();
+    gatheredBoxes.dispose();
+    gatheredScores.dispose();
+    gatheredClasses.dispose();
+}
+
+
 const predictButton = new Toggle({
     title: "Predict",
     className: "predict-button",
@@ -714,6 +767,16 @@ const predictButton = new Toggle({
     }
 });
 mainbar.addControl(predictButton);
+
+function toggleUI() {
+    const controls = document.getElementsByClassName('ol-control');
+    for (let i = 0; i < controls.length; i++) {
+        controls[i].style.display = controls[i].style.display === 'none' ? '' : 'none';
+    }
+    document.getElementsByClassName('ol-overlaycontainer')[0].style.display = document.getElementsByClassName('ol-overlaycontainer')[0].style.display === 'none' ? '' : 'none';
+    document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display = document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display === 'none' ? '' : 'none';
+    document.getElementById('HowToUse').style.display = document.getElementById('HowToUse').style.display === 'none' ? '' : 'none';
+}
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
 document.addEventListener('keydown', function (event) {
@@ -738,13 +801,9 @@ document.addEventListener('keydown', function (event) {
     } else if (event.key === 'c') { // clear the detection layer predictions
         geojsonSource.clear();
     } else if (event.key === 'h') { // hide everything but the map
-        const controls = document.getElementsByClassName('ol-control');
-        for (let i = 0; i < controls.length; i++) {
-            controls[i].style.display = controls[i].style.display === 'none' ? '' : 'none';
-        }
-        document.getElementsByClassName('ol-overlaycontainer')[0].style.display = document.getElementsByClassName('ol-overlaycontainer')[0].style.display === 'none' ? '' : 'none';
-        document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display = document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display === 'none' ? '' : 'none';
-        document.getElementById('HowToUse').style.display = document.getElementById('HowToUse').style.display === 'none' ? '' : 'none';
+        toggleUI()
+    } else if (event.key === 'u') { // update the detections in [] with nms and update the layer
+        nmsDetections();
     }
 
 }, { passive: true });
@@ -828,7 +887,7 @@ tfjs_worker.postMessage({ url: document.URL });
 // Listen for messages from the worker
 let modelLoadingStatusElement = document.getElementById('modelLoading');
 tfjs_worker.onmessage = function (event) {
-    const { ready, results, labels, error } = event.data;
+    const { ready, results, labels, error, nms } = event.data;
 
     // Check if the message indicates that the model is ready
     if (ready === true) {
@@ -863,6 +922,10 @@ tfjs_worker.onmessage = function (event) {
         });
     }
 
+    if (nms) {
+        nmsDetections(); // run nms on all detections
+    }
+
     // Handle the labels if the model is ready
     if (labels) {
         updateLabels(labels);
@@ -888,4 +951,3 @@ function runModelOnBoxes() {
     tfjs_worker.postMessage({ tiles: tiles });
     bboxList = [];
 }
-
