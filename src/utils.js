@@ -9,7 +9,7 @@ let labels = [];
 let colors = [];
 export function updateLabels(newLabels) {
     labels = newLabels;
-    colors = Array.from({ length: labels.length }, () => randomColor(0.2));
+    colors = Array.from({ length: labels.length }, () => randomColor(0.1));
 }
 
 // Function to create text style

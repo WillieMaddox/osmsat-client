@@ -27,7 +27,7 @@ This tool allows you to perform various actions on the map:
 - **m**: Toggles the measurement mode.
 - **b**: Toggles the bounding box drawing mode.
 - **l**: Toggles the model info panel.
-- **q**: Sends a single tile to the worker for debugging. The tile coordinates are `{ x: 100732, y: 212643, z: 19 }`.
+- **q**: Sends a single tile to the worker for debugging. `{ x: 100732, y: 212643, z: 19 }`.
 - **c**: Clears the detection layer predictions.
 - **h**: Hides or shows all controls and overlays, including the "How To Use" panel.
 

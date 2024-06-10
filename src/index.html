@@ -8,9 +8,40 @@
     href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
   <script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <style>
+    #loader {
+      border: 12px solid #6c6c6c;
+      border-radius: 50%;
+      border-top: 12px solid #f3f3f3;
+      width: 70px;
+      height: 70px;
+      animation: spin 1s linear infinite;
+    }
+
+    .center {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      margin: auto;
+    }
+
+    html {
+      background-color: #3b3b3b;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
 </head>
 
+
 <body>
+  <div id="loader" class="center"></div>
   <div id="map">
 
     <div id="panel" class="ol-attribution">
@@ -166,7 +197,7 @@
           <strong>l</strong>: Toggles the model info panel.
         </div>
         <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
-          <strong>q</strong>: Sends a single tile to the worker for debugging. The tile coordinates are `{ x: 100732, y: 212643, z: 19 }`.
+          <strong>q</strong>: Sends a single tile to the worker for debugging. `{ x: 100732, y: 212643, z: 19 }`.
         </div>
         <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
           <strong>c</strong>: Clears the detection layer predictions.
@@ -177,6 +208,18 @@
       </div>
 
     </div>
+
+    <script>
+      document.onreadystatechange = function () {
+        if (document.readyState !== "complete") {
+          document.querySelector("body").style.visibility = "hidden";
+          document.querySelector("#loader").style.visibility = "visible";
+        } else {
+          document.querySelector("#loader").style.display = "none";
+          document.querySelector("body").style.visibility = "visible";
+        }
+      };
+    </script>
 </body>
 
 </html>
