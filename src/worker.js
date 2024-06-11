@@ -214,6 +214,7 @@ self.onmessage = async function (event) {
         const tile = event.data.debugTile;
         const debugResults = await debugTile(tile);
         self.postMessage({ results: debugResults });
+        self.postMessage({ nms: true }); // run the nms on the debug results
     }
 };
 

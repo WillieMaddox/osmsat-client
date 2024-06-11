@@ -717,12 +717,14 @@ async function nmsDetections() {
     // run nms
     const boxesTensor = tf.tensor2d(boxes, [boxes.length, 4]); // [x, 4]
     const scoresTensor = tf.tensor1d(scores); // [x]
-    const nmsIndices = await tf.image.nonMaxSuppressionAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .5)
+    // const nmsIndices = await tf.image.nonMaxSuppressionAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .5)
+    const nms_results = await tf.image.nonMaxSuppressionWithScoreAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .1);
+    // console.log(nms_results, nms_results.selectedIndices, nmsIndices);
 
     // gather results
-    const gatheredBoxes = boxesTensor.gather(nmsIndices);
-    const gatheredScores = scoresTensor.gather(nmsIndices);
-    const gatheredClasses = tf.gather(tf.tensor1d(classes, 'int32'), nmsIndices); // int32 for class indices
+    const gatheredBoxes = boxesTensor.gather(nms_results.selectedIndices);
+    const gatheredScores = scoresTensor.gather(nms_results.selectedIndices);
+    const gatheredClasses = tf.gather(tf.tensor1d(classes, 'int32'), nms_results.selectedIndices); // int32 for class indices
 
     const boxesData = await gatheredBoxes.array();
     const scoresData = await gatheredScores.array();
