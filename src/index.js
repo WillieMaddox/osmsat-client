@@ -266,16 +266,6 @@ let thunderforestAttributions = [
     ATTRIBUTION
 ]
 
-// let bingmapslayer = new TileLayer({
-//     title: 'Bing Aerial',
-//     visible: true,
-//     baseLayer: true,
-//     source: new BingMaps({
-//         key: process.env.BINGMAPS_API_KEY,
-//         imagerySet: 'Aerial',
-//     })
-// });
-
 // TODO: Make these layers work
 // let Mapbox512_localhost = new TileLayer({
 //     title: 'Mapbox512 (on localhost)',
@@ -342,6 +332,63 @@ let thunderforestAttributions = [
 //     ]
 // });
 
+
+function ThunderForestSource (layer) {
+    return new OSM({
+        url: 'https://{a-c}.tile.thunderforest.com/' + layer + '/{z}/{x}/{y}.png' +
+            '?apikey=' + process.env.THUNDERFOREST_API_KEY,
+        attributions: thunderforestAttributions
+    });
+}
+
+function GoogleSource (layer) {
+    return new XYZ({
+        url: 'https://mt{0-3}.google.com/vt/lyrs=' + layer + '&x={x}&y={y}&z={z}',
+        // url: 'http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}',
+        // url: 'https://khms0.googleapis.com/kh?&v=870&x={x}&y={y}&z={z}',
+        // url: 'https://khms0.google.com/kh/v=908?x={x}&y={y}&z={z}',
+        // url: 'http://www.google.cn/maps/vt?lyrs=s@189&gl=cn&x={x}&y={y}&z={z}'
+        // tileLoadFunction: function(tile, src) {
+        //     tile.getImage().src = src;
+        // },
+    });
+}
+
+function BingSource (layer) {
+    return new BingMaps({
+        key: process.env.BINGMAPS_API_KEY,
+        imagerySet: layer
+    });
+}
+
+let sourceMapbox = new XYZ({
+    url: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90' +
+        '?access_token=' + process.env.MAPBOX_API_KEY,
+});
+
+let sourceTFOutdoors = new ThunderForestSource('outdoors')
+let sourceTFLandscape = new ThunderForestSource('landscape')
+let sourceTFTransport = new ThunderForestSource('transport')
+let sourceTFTransportDark = new ThunderForestSource('transport-dark')
+let sourceTFCycle = new ThunderForestSource('cycle')
+
+let sourceGoogleSatellite = new GoogleSource('s')
+let sourceGoogleRoads = new GoogleSource('r')
+let sourceGoogleLabels = new GoogleSource('h')
+
+let sourceBingAerial = new BingSource('Aerial')
+let sourceBingRoads = new BingSource('Road')
+
+// function handleTileLoad(event) {
+//     const tile = event.tile;
+//     const url = tile.src;
+//     if (!xyzsource.has(url)) {
+//         // If tile not already in cache, add it
+//         xyzsource.set(url, tile);
+//     }
+// }
+// xyzsource.on('tileloadend', handleTileLoad);
+
 // TODO: Add Attribution for left hand layer.
 function StaticGroup () {
     return new LayerGroup({
@@ -367,84 +414,56 @@ function StaticGroup () {
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new OSM({
-                            url: 'https://{a-c}.tile.thunderforest.com/cycle/{z}/{x}/{y}.png' +
-                                '?apikey=' + process.env.THUNDERFOREST_API_KEY,
-                            attributions: thunderforestAttributions
-                        })
+                        source: sourceTFCycle,
                     }),
                     new TileLayer({
                         title: 'Transport Dark',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new OSM({
-                            url: 'https://{a-c}.tile.thunderforest.com/transport-dark/{z}/{x}/{y}.png' +
-                                '?apikey=' + process.env.THUNDERFOREST_API_KEY,
-                            attributions: thunderforestAttributions
-                        })
+                        source: sourceTFTransportDark,
                     }),
                     new TileLayer({
                         title: 'Transport',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new OSM({
-                            url: 'https://{a-c}.tile.thunderforest.com/transport/{z}/{x}/{y}.png' +
-                                '?apikey=' + process.env.THUNDERFOREST_API_KEY,
-                            attributions: thunderforestAttributions
-                        })
+                        source: sourceTFTransport,
                     }),
                     new TileLayer({
                         title: 'Landscape',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new OSM({
-                            url: 'https://{a-c}.tile.thunderforest.com/landscape/{z}/{x}/{y}.png' +
-                                '?apikey=' + process.env.THUNDERFOREST_API_KEY,
-                            attributions: thunderforestAttributions
-                        })
+                        source: sourceTFLandscape,
                     }),
                     new TileLayer({
                         title: 'Outdoors',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new OSM({
-                            url: 'https://{a-c}.tile.thunderforest.com/outdoors/{z}/{x}/{y}.png' +
-                                '?apikey=' + process.env.THUNDERFOREST_API_KEY,
-                            attributions: thunderforestAttributions
-                        })
+                        source: sourceTFOutdoors,
                     }),
                     new TileLayer({
                         title: 'Google (Roads)',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new XYZ({
-                            url: 'https://mt{0-3}.google.com/vt/lyrs=r&x={x}&y={y}&z={z}',
-                        }),
+                        source: sourceGoogleRoads,
                     }),
                     new TileLayer({
                         title: 'Bing (Roads)',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new BingMaps({
-                            key: process.env.BINGMAPS_API_KEY,
-                            imagerySet: 'Road'
-                        })
+                        source: sourceBingRoads,
                     }),
                     // new TileLayer({
                     //     title: 'Bing (Hybrid)',
                     //     visible: false,
                     //     baseLayer: true,
-                    // noSwitcherDelete: true,
-                    //     source: new BingMaps({
-                    //         key: process.env.BINGMAPS_API_KEY,
-                    //         imagerySet: 'AerialWithLabels'
-                    //     })
+                    //     noSwitcherDelete: true,
+                    //     source: sourceBingAerialWithLabels,
                     // }),
                     new TileLayer({
                         title: 'Mapbox',
@@ -452,35 +471,21 @@ function StaticGroup () {
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new XYZ({
-                            url: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90' +
-                                '?access_token=' + process.env.MAPBOX_API_KEY,
-                        }),
+                        source: sourceMapbox,
                     }),
                     new TileLayer({
                         title: 'Google',
-                        // title: 'Google (Satellite)',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new XYZ({
-                            url: 'https://mt{0-3}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-                            // url: 'http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}',
-                            // url: 'https://khms0.googleapis.com/kh?&v=870&x={x}&y={y}&z={z}',
-                            // url: 'https://khms0.google.com/kh/v=908?x={x}&y={y}&z={z}',
-                            // url: 'http://www.google.cn/maps/vt?lyrs=s@189&gl=cn&x={x}&y={y}&z={z}'
-                        }),
+                        source: sourceGoogleSatellite,
                     }),
                     new TileLayer({
                         title: 'Bing',
-                        // title: 'Bing (Aerial)',
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new BingMaps({
-                            key: process.env.BINGMAPS_API_KEY,
-                            imagerySet: 'Aerial'
-                        })
+                        source: sourceBingAerial,
                     }),
                     // new MapboxVectorLayer({
                     //     title: 'OSM (Mapbox Vector Layer)',
@@ -551,9 +556,7 @@ function StaticGroup () {
                         title: 'Google (Labels)',
                         visible: false,
                         baseLayer: false,
-                        source: new XYZ({
-                            url: 'https://mt{0-3}.google.com/vt/lyrs=h&x={x}&y={y}&z={z}',
-                        }),
+                        source: sourceGoogleLabels,
                     }),
                 ]
             })
@@ -721,7 +724,7 @@ function initswipelayer ({layergroup, right, idx = 0} = {}) {
     }
     // console.log(layer.get('title') + (right?" right":" left"));
 }
-initswipelayer({layergroup: leftgroup, right: false, idx: 5})
+initswipelayer({layergroup: leftgroup, right: false, idx: 10})
 initswipelayer({layergroup: rightgroup, right: true, idx: 1})
 map.addControl(swipe);
 
