@@ -366,6 +366,7 @@ let sourceMapbox = new XYZ({
         '?access_token=' + process.env.MAPBOX_API_KEY,
 });
 
+let sourceOSM = new OSM()
 let sourceTFOutdoors = new ThunderForestSource('outdoors')
 let sourceTFLandscape = new ThunderForestSource('landscape')
 let sourceTFTransport = new ThunderForestSource('transport')
@@ -403,7 +404,7 @@ function StaticGroup () {
                         visible: false,
                         baseLayer: true,
                         noSwitcherDelete: true,
-                        source: new OSM(),
+                        source: sourceOSM,
                         // source: new OSM({
                         //     url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                         //     crossOrigin: null,
