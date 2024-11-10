@@ -20,6 +20,7 @@ import { createStringXY, toStringHDMS } from 'ol/coordinate';
 import { GeoJSON, TopoJSON, MVT, GPX, IGC, KML, WKB } from 'ol/format';
 import { Attribution, MousePosition, ScaleLine } from 'ol/control';
 import { Select, Draw, Modify, DragAndDrop, Snap, defaults as defaultInteractions } from 'ol/interaction';
+import { singleClick } from 'ol/events/condition';
 
 // import VectorTileSource from 'ol/source/VectorTile';
 import { Vector as VectorSource, XYZ } from 'ol/source';
@@ -38,6 +39,7 @@ import Toggle from 'ol-ext/control/Toggle';
 // import UndoRedo from "ol-ext/interaction/UndoRedo";
 import DrawRegular from "ol-ext/interaction/DrawRegular";
 // import FillAttribute from "ol-ext/interaction/FillAttribute";
+import FeatureList from "ol-ext/control/FeatureList";
 import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
@@ -695,6 +697,7 @@ let layerswitcherleft = new LayerSwitcher({
     reordering: false,
     switcherClass: "layerSwitcherLeft ol-layerswitcher",
     layerGroup: leftgroup,
+    oninfo: function (l) {},
     onchangeCheck: switchleft
 });
 map.addControl(layerswitcherleft);
@@ -753,6 +756,44 @@ mainbar.addControl(debugLayerToggle);
 /* Nested toobar with one control activated at once */
 var nestedbar = new Bar ({ toggleOne: true, group:true });
 mainbar.addControl(nestedbar);
+
+layerswitcherleft.on('info', function (e) {
+    if (!e.layer.get('baseLayer')) {
+        featurelist.setFeatures(e.layer.getSource())
+    }
+});
+
+// Select  interaction
+const select = new Select({
+    hitTolerance: 5,
+    condition: singleClick
+});
+map.addInteraction(select);
+
+// Select feature when click on the reference index
+select.on('select', function(e) {
+    const f = e.selected[0];
+    if (f) {
+        featurelist.select(f)
+    }
+});
+
+// Select control
+let featurelist = new FeatureList({
+    title: 'Communes',
+    collapsed: true,
+});
+map.addControl(featurelist);
+
+featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon')
+featurelist.on('select', function(e) {
+    select.getFeatures().clear();
+    select.getFeatures().push(e.feature);
+});
+featurelist.on('dblclick', function(e) {
+    map.getView().fit(e.feature.getGeometry().getExtent())
+    map.getView().setZoom(map.getView().getZoom() - 1)
+});
 
 // Interactions
 // TODO: Add ability to drop in shapefiles.

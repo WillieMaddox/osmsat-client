@@ -37,7 +37,7 @@ html, body {
 }
 #LeftLayerLabel {
     position: absolute;
-    top: 6em;
+    top: 12em;
     left: 0.5em;
     font-family: "Arial";
     font-size: 12pt;
@@ -45,7 +45,7 @@ html, body {
 }
 #RightLayerLabel {
     position: absolute;
-    top: 6em;
+    top: 12em;
     right: 0.5em;
     font-family: "Arial";
     font-size: 12pt;
@@ -53,8 +53,7 @@ html, body {
 }
 #ZoomElement {
     position: absolute;
-    top: auto;
-    left: 10px;
+    left: 8.0em;
     font-family: "Arial";
     font-size: 12pt;
     text-shadow: 0 0 0.5em #FFE, 0 0 0.5em #FFE, 0 0 0.5em #FFE;
@@ -64,29 +63,28 @@ html, body {
 }
 .ol-custom-mouse-position {
     position: absolute;
-    top: auto;
-    left: 10px;
+    left: 1em;
     font-family: "Arial";
     font-size: 12pt;
     text-shadow: 0 0 0.7em #FFF, 0 0 0.7em #FFF, 0 0 0.7em #FFF;
 }
 .ol-custom-mouse-positionHDMS {
-    bottom: 11.5em;
+    top: 1em;
 }
 .ol-custom-mouse-position4326 {
-    bottom: 9.5em;
+    top: 3em;
 }
 .ol-custom-mouse-position900913 {
-    bottom: 7.5em;
+    top: 5em;
 }
 .ol-custom-mouse-positionPIXEL {
-    bottom: 5.5em;
+    top: 7em;
 }
 .ol-custom-mouse-positionTILE {
-    bottom: 3.5em;
+    top: 9em;
 }
 .ol-control.ol-layerswitcher {
-    top: 8em;
+    top: 14em;
 }
 .ol-control.ol-layerswitcher.layerSwitcherLeft {
     left: 0.5em;
@@ -119,7 +117,7 @@ html, body {
     left: 11em;
 }
 .ol-search {
-    left: 13em;
+    left: 22em;
 }
 .ol-search ul {
     color: #333;
@@ -164,4 +162,7 @@ html, body {
 .ol-button.blue button:hover {
     background-color: currentColor!important;
     border-color: #000;
+}
+.ol-scale-line {
+    left: 2.2em;
 }
