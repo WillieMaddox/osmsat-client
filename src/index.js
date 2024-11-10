@@ -30,7 +30,6 @@ import LayerGroup from 'ol/layer/Group';
 // import VectorTileLayer from 'ol/layer/VectorTile';
 // import MapboxVectorLayer from 'ol/layer/MapboxVector';
 // import { MapboxVectorLayer } from 'ol-mapbox-style';
-// import ol_ext_element from 'ol-ext/util/element';
 import Bar from 'ol-ext/control/Bar';
 import Swipe from 'ol-ext/control/Swipe';
 import Toggle from 'ol-ext/control/Toggle';
@@ -366,19 +365,19 @@ let sourceMapbox = new XYZ({
         '?access_token=' + process.env.MAPBOX_API_KEY,
 });
 
-let sourceOSM = new OSM()
-let sourceTFOutdoors = new ThunderForestSource('outdoors')
-let sourceTFLandscape = new ThunderForestSource('landscape')
-let sourceTFTransport = new ThunderForestSource('transport')
-let sourceTFTransportDark = new ThunderForestSource('transport-dark')
-let sourceTFCycle = new ThunderForestSource('cycle')
+let sourceOSM = new OSM();
+let sourceTFOutdoors = new ThunderForestSource('outdoors');
+let sourceTFLandscape = new ThunderForestSource('landscape');
+let sourceTFTransport = new ThunderForestSource('transport');
+let sourceTFTransportDark = new ThunderForestSource('transport-dark');
+let sourceTFCycle = new ThunderForestSource('cycle');
 
-let sourceGoogleSatellite = new GoogleSource('s')
-let sourceGoogleRoads = new GoogleSource('r')
-let sourceGoogleLabels = new GoogleSource('h')
+let sourceGoogleSatellite = new GoogleSource('s');
+let sourceGoogleRoads = new GoogleSource('r');
+let sourceGoogleLabels = new GoogleSource('h');
 
-let sourceBingAerial = new BingSource('Aerial')
-let sourceBingRoads = new BingSource('Road')
+let sourceBingAerial = new BingSource('Aerial');
+let sourceBingRoads = new BingSource('Road');
 
 // function handleTileLoad(event) {
 //     const tile = event.tile;
@@ -877,7 +876,7 @@ bboxToggle.on('change:active', function (e) {
     bboxLayer.getSource().clear();
     bboxInteraction.setActive(e.active);
     bboxLayer.setVisible(e.active);
-})
+});
 nestedbar.addControl(bboxToggle);
 
 let bboxInteraction = new DrawRegular({
@@ -1020,7 +1019,7 @@ function addInteraction() {
     });
     measureModify.setActive(true);
     map.addInteraction(measureDraw);
-}
+};
 typeSelect.onchange = function () {
     map.removeInteraction(measureDraw);
     addInteraction();
