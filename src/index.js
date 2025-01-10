@@ -45,9 +45,7 @@ import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
 const style = new Style({
-    fill: new Fill({
-        color: 'rgba(255, 255, 255, 0.2)',
-    }),
+    fill: new Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
     stroke: new Stroke({
         color: 'rgba(0, 0, 0, 0.5)',
         lineDash: [10, 10],
@@ -55,23 +53,15 @@ const style = new Style({
     }),
     image: new CircleStyle({
         radius: 5,
-        stroke: new Stroke({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 0.2)',
-        }),
+        stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.7)' }),
+        fill: new Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
     }),
 });
 const labelStyle = new Style({
     text: new Text({
         font: '14px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
+        fill: new Fill({ color: 'rgba(255, 255, 255, 1)' }),
+        backgroundFill: new Fill({ color: 'rgba(0, 0, 0, 0.7)' }),
         padding: [3, 3, 3, 3],
         textBaseline: 'bottom',
         offsetY: -15,
@@ -81,20 +71,14 @@ const labelStyle = new Style({
         points: 3,
         angle: Math.PI,
         displacement: [0, 10],
-        fill: new Fill({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
+        fill: new Fill({ color: 'rgba(0, 0, 0, 0.7)' }),
     }),
 });
 const tipStyle = new Style({
     text: new Text({
         font: '12px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
+        fill: new Fill({ color: 'rgba(255, 255, 255, 1)' }),
+        backgroundFill: new Fill({ color: 'rgba(0, 0, 0, 0.4)' }),
         padding: [2, 2, 2, 2],
         textAlign: 'left',
         offsetX: 15,
@@ -103,22 +87,14 @@ const tipStyle = new Style({
 const modifyStyle = new Style({
     image: new CircleStyle({
         radius: 5,
-        stroke: new Stroke({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
-        fill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
+        stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.7)' }),
+        fill: new Fill({ color: 'rgba(0, 0, 0, 0.4)' }),
     }),
     text: new Text({
         text: 'Drag to modify',
         font: '12px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.7)',
-        }),
+        fill: new Fill({ color: 'rgba(255, 255, 255, 1)' }),
+        backgroundFill: new Fill({ color: 'rgba(0, 0, 0, 0.7)' }),
         padding: [2, 2, 2, 2],
         textAlign: 'left',
         offsetX: 15,
@@ -127,12 +103,8 @@ const modifyStyle = new Style({
 const segmentStyle = new Style({
     text: new Text({
         font: '12px Calibri,sans-serif',
-        fill: new Fill({
-            color: 'rgba(255, 255, 255, 1)',
-        }),
-        backgroundFill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
+        fill: new Fill({ color: 'rgba(255, 255, 255, 1)' }),
+        backgroundFill: new Fill({ color: 'rgba(0, 0, 0, 0.4)' }),
         padding: [2, 2, 2, 2],
         textBaseline: 'bottom',
         offsetY: -12,
@@ -142,9 +114,7 @@ const segmentStyle = new Style({
         points: 3,
         angle: Math.PI,
         displacement: [0, 8],
-        fill: new Fill({
-            color: 'rgba(0, 0, 0, 0.4)',
-        }),
+        fill: new Fill({ color: 'rgba(0, 0, 0, 0.4)' }),
     }),
 });
 const segmentStyles = [segmentStyle];
@@ -386,16 +356,6 @@ let sourceBingAerial = new BingSource('Aerial');
 let sourceBingRoads = new BingSource('Road');
 
 let sourceMapbox = new MapboxSource()
-
-// function handleTileLoad(event) {
-//     const tile = event.tile;
-//     const url = tile.src;
-//     if (!xyzsource.has(url)) {
-//         // If tile not already in cache, add it
-//         xyzsource.set(url, tile);
-//     }
-// }
-// xyzsource.on('tileloadend', handleTileLoad);
 
 // TODO: Add Attribution for left hand layer.
 function StaticGroup() {
@@ -1060,7 +1020,7 @@ function addInteraction() {
     });
     measureModify.setActive(true);
     map.addInteraction(measureDraw);
-};
+}
 typeSelect.onchange = function () {
     map.removeInteraction(measureDraw);
     addInteraction();
