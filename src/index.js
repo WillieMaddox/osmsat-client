@@ -119,94 +119,19 @@ const segmentStyle = new Style({
 });
 const segmentStyles = [segmentStyle];
 
-function toRad(x) {
-    return x * Math.PI / 180.0
-}
-function toInt(x) {
-    return ~~x
-}
-function mod(n, m) {
-    return ((n % m) + m) % m
-}
-function randomHexColor() {
-    const num = Math.floor(Math.random() * 16777215).toString(16)
-    return '#' + String.prototype.repeat.call('0', 6 - num.length) + num
-}
-function convertHex(hex, opacity) {
-    let rgb;
-    hex = hex.replace('#', '');
-    const idx = toInt(Math.floor(Math.random() * 3))
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    if (opacity) {
-        rgb = [r, g, b, opacity]
-    } else {
-        rgb = [r, g, b]
-    }
-    rgb[idx] = 255
-    return rgb
-}
-function randomColor(opacity) {
-    const idx = toInt(Math.floor(Math.random() * 3));
-    const r = idx === 0 ? 255 : toInt(Math.floor(Math.random() * 256));
-    const g = idx === 1 ? 255 : toInt(Math.floor(Math.random() * 256));
-    const b = idx === 2 ? 255 : toInt(Math.floor(Math.random() * 256));
-    if (opacity) {
-        return [r, g, b, opacity]
-    } else {
-        return [r, g, b]
-    }
-}
-function deg2tile(lon_deg, lat_deg, zoom) {
-    const lat_rad = toRad(lat_deg)
-    const ztile = Math.round(zoom)
-    const n = Math.pow(2, ztile)
-    const xtile = toInt(mod((lon_deg + 180.0) / 360.0, 1) * n)
-    const ytile = toInt((1.0 - Math.log(Math.tan(lat_rad) + (1 / Math.cos(lat_rad))) / Math.PI) / 2.0 * n)
-    return [xtile, ytile, ztile]
-}
-function meter2pixel(mx, my, zoom) {
-    let ires = 2 * Math.PI * 6378137 / 256
-    let oshift = 2 * Math.PI * 6378137 / 2.0
-    let ztile = Math.round(zoom)
-    let res = ires / Math.pow(2, ztile)
-    let xpixel = toInt((mx + oshift) / res)
-    let ypixel = toInt((my + oshift) / res)
-    let mapsize = 256 << ztile
-    ypixel = mapsize - ypixel
-    return [xpixel, ypixel]
-}
-function meter2tile(mx, my, zoom) {
-    let ires = 2 * Math.PI * 6378137 / 256
-    let oshift = 2 * Math.PI * 6378137 / 2.0
-    let ztile = Math.round(zoom)
-    let res = ires / Math.pow(2, ztile)
-    let xpixel = toInt((mx + oshift) / res)
-    let ypixel = toInt((my + oshift) / res)
-    let mapsize = 256 << ztile
-    ypixel = mapsize - ypixel
-    let xtile = toInt(xpixel / 256)
-    let ytile = toInt(ypixel / 256)
-    let xcol = mod(xpixel, 256)
-    let yrow = mod(ypixel, 256)
-    return [xtile, ytile, ztile, xcol, yrow]
-}
-function coordinateFormatPIXEL(coord) {
-    let zoom = view.getZoom()
-    let xypixel = meter2pixel(coord[0], coord[1], zoom)
-    let x = 'X: ' + xypixel[0]
-    let y = 'Y: ' + xypixel[1]
+function coordinateFormatPIXEL(coord, zoom) {
+    const xypixel = meter2pixel(coord[0], coord[1], zoom)
+    const x = 'X: ' + xypixel[0]
+    const y = 'Y: ' + xypixel[1]
     return [x, y].join('   ')
 }
-function coordinateFormatTILE(coord) {
-    let zoom = view.getZoom()
-    let xytile = meter2tile(coord[0], coord[1], zoom)
-    let x = 'X: ' + xytile[0]
-    let y = 'Y: ' + xytile[1]
-    let z = 'Z: ' + xytile[2]
-    let c = 'C: ' + xytile[3]
-    let r = 'R: ' + xytile[4]
+function coordinateFormatTILE(coord, zoom) {
+    const xytile = meter2tile4(coord[0], coord[1], zoom)
+    const z = 'Z: ' + zoom
+    const x = 'X: ' + xytile[0]
+    const y = 'Y: ' + xytile[1]
+    const c = 'C: ' + xytile[2]
+    const r = 'R: ' + xytile[3]
     return [z, x, y, c, r].join('   ')
 }
 
@@ -570,14 +495,14 @@ let controls = [
     }),
     new MousePosition({
         coordinateFormat: function(coord) {
-            return 'PIXEL: ' + coordinateFormatPIXEL(coord);
+            return 'PIXEL: ' + coordinateFormatPIXEL(coord, Math.round(view.getZoom()));
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionPIXEL',
         projection: 'EPSG:900913',
     }),
     new MousePosition({
         coordinateFormat: function(coord) {
-            return 'TILE: ' + coordinateFormatTILE(coord);
+            return 'TILE: ' + coordinateFormatTILE(coord, Math.round(view.getZoom()));
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionTILE',
         projection: 'EPSG:900913',
