@@ -35,7 +35,7 @@ import LayerGroup from 'ol/layer/Group';
 import Bar from 'ol-ext/control/Bar';
 import Swipe from 'ol-ext/control/Swipe';
 import Toggle from 'ol-ext/control/Toggle';
-// import Button from 'ol-ext/control/Button';
+import Button from 'ol-ext/control/Button';
 // import EditBar from 'ol-ext/control/EditBar';
 // import UndoRedo from "ol-ext/interaction/UndoRedo";
 import DrawRegular from "ol-ext/interaction/DrawRegular";
@@ -43,6 +43,10 @@ import DrawRegular from "ol-ext/interaction/DrawRegular";
 import FeatureList from "ol-ext/control/FeatureList";
 import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
+
+import { mod, randomColor, meter2pixel, meter2tile2, meter2tile4 } from './utils';
+import { updateLabels } from './utils';
+import * as tf from '@tensorflow/tfjs';
 
 const style = new Style({
     fill: new Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
@@ -118,6 +122,43 @@ const segmentStyle = new Style({
     }),
 });
 const segmentStyles = [segmentStyle];
+// Function to create text style with hardcoded settings
+const createTextStyle = function (feature, resolution) {
+    const maxResolution = 2400;
+    let classIndex = feature.get('classIndex');
+    let score = feature.get('score');
+    let className = labels[classIndex];
+    let text = `${className} ${Math.round(score * 100)}%`;
+    // eval text as number and select class from labels
+    if (resolution > maxResolution) { text = ''; }
+    return new Text({
+        textAlign: undefined,
+        textBaseline: 'bottom',
+        font: 'Bold 14x/1 Open Sans',
+        text: text,
+        fill: new Fill({ color: '#ffffff' }),
+        stroke: new Stroke({ color: '#000000', width: 3 }),
+        offsetX: 0,
+        offsetY: 0,
+        placement: 'point',
+        maxAngle: 45,
+        overflow: false,
+        rotation: 0,
+    });
+};
+// Function to style polygons with hardcoded settings
+const polygonStyleFunction = (feature, resolution) => {
+    let classIndex = feature.get('classIndex');
+    let fillColor = colors[classIndex];
+    return new Style({
+        stroke: new Stroke({
+            color: fillColor.slice(0, 3).concat([0.5]),
+            width: 1,
+        }),
+        fill: new Fill({ color: fillColor }),
+        text: createTextStyle(feature, resolution),
+    });
+};
 
 function coordinateFormatPIXEL(coord, zoom) {
     const xypixel = meter2pixel(coord[0], coord[1], zoom)
@@ -526,6 +567,8 @@ let map = new Map({
     maxTilesLoading: 24
 });
 
+map.setProperties({'loading': true, 'moving': true}, true);
+
 let $LeftLayerLabelDiv = document.createElement('div')
 $LeftLayerLabelDiv.id = 'LeftLayerLabel'
 $LeftLayerLabelDiv.className = 'ol-unselectable ol-control'
@@ -631,6 +674,42 @@ map.addControl(swipe);
 // Main control bar
 var mainbar = new Bar();
 map.addControl(mainbar);
+
+// Add a button to get predictions from the active baselayer.
+let predictButton = new Button({
+    title: "Predict",
+    className: "predict-button",
+    html: '<i class="fa">P</i>',
+    disabled: true,
+    handleClick: function (e) {
+        runModelOnTiles();
+        // modelElement.style.display = active ? 'flex' : 'none';
+    }
+});
+mainbar.addControl(predictButton);
+
+let predictionWindow;
+map.on('movestart', function(e) {
+    map.set('moving', true, true);
+    predictButton.setDisable(true);
+    predictButton.setHtml('<i class="fa" style="opacity: 0.5;">P</i>');
+});
+map.on('loadstart', function(e) {
+    map.set('loading', true, true);
+    predictButton.setDisable(true);
+    predictButton.setHtml('<i class="fa" style="opacity: 0.5;">P</i>');
+});
+map.on('moveend', function(e) {
+    map.set('moving', false, false);
+    predictionWindow = e.frameState.extent;
+    predictButton.setHtml('<i class="fa">P</i>');
+    predictButton.setDisable(false);
+});
+map.on('loadend', function(e) {
+    map.set('loading', false, false);
+    predictButton.setHtml('<i class="fa">P</i>');
+    predictButton.setDisable(false);
+});
 
 // An overlay that stay on top
 let debugLayer = new TileLayer({
@@ -957,5 +1036,126 @@ showSegments.onchange = function () {
     measureDraw.getOverlay().changed();
 };
 
-// In the current implementation of LayerSwitcher layers don't overlap, so we turn off opacity.
-document.body.classList.add('hideOpacity')
+// make a vector layer for detections
+const detectionSource = new VectorSource();
+const detectionLayer = new VectorLayer({
+    source: detectionSource,
+    title: "Detections",
+    visible: true,
+    baseLayer: false,
+    displayInLayerSwitcher: true,
+    style: polygonStyleFunction
+});
+map.addLayer(detectionLayer);
+rightgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
+leftgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
+
+async function nmsDetections() {
+    // create boxes, scores, and classes from feature values
+    let boxes = [];
+    let scores = [];
+    let classes = [];
+    detectionSource.getFeatures().forEach((feature) => {
+        const extent = feature.getGeometry().getExtent();
+        boxes.push([extent[0], extent[1], extent[2], extent[3]]);
+        scores.push(feature.get('score'));
+        classes.push(feature.get('classIndex'));
+    });
+
+    // run nms
+    const boxesTensor = tf.tensor2d(boxes, [boxes.length, 4]); // [x, 4]
+    const scoresTensor = tf.tensor1d(scores); // [x]
+    // const nmsIndices = await tf.image.nonMaxSuppressionAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .5)
+    const nms_results = await tf.image.nonMaxSuppressionWithScoreAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .1);
+    // console.log(nms_results, nms_results.selectedIndices, nmsIndices);
+
+    // gather results
+    const gatheredBoxes = boxesTensor.gather(nms_results.selectedIndices);
+    const gatheredScores = scoresTensor.gather(nms_results.selectedIndices);
+    const gatheredClasses = tf.gather(tf.tensor1d(classes, 'int32'), nms_results.selectedIndices); // int32 for class indices
+
+    const boxesData = await gatheredBoxes.array();
+    const scoresData = await gatheredScores.array();
+    const classesData = await gatheredClasses.array();
+
+    // replace the current features with the nms results
+    detectionSource.clear();
+    for (let i = 0; i < scoresData.length; i++) {
+        const bbox = boxesData[i];
+        const score = scoresData[i];
+        const cls = classesData[i];
+        const feature = new Feature(new Polygon([[
+            [bbox[0], bbox[1]],
+            [bbox[0], bbox[3]],
+            [bbox[2], bbox[3]],
+            [bbox[2], bbox[1]],
+            [bbox[0], bbox[1]]
+        ]]));
+        feature.setProperties({ score: score, classIndex: cls });
+        detectionSource.addFeature(feature);
+    }
+
+    // dispose tensors to free memory
+    boxesTensor.dispose();
+    scoresTensor.dispose();
+    gatheredBoxes.dispose();
+    gatheredScores.dispose();
+    gatheredClasses.dispose();
+}
+
+function get_tiles_from_extent(box) {
+    let z = Math.round(view.getZoom())
+    let [x0, y0] = meter2tile2(box[0], box[1], z);
+    let [x1, y1] = meter2tile2(box[2], box[3], z);
+
+    // Collect all tiles within the bounding box
+    let tiles = [];
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+            tiles.push({ x, y, z });
+        }
+    }
+    return tiles;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    tfjs_worker.postMessage({ model: "tfjs_web_model_path", type: "model_type" });
+    document.body.classList.add('hideOpacity')
+}, { passive: true });
+
+// YOLO predict code
+const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
+tfjs_worker.postMessage({ url: document.URL });
+
+// Listen for messages from the worker
+tfjs_worker.onmessage = function (event) {
+    const { results, labels, error, nms } = event.data;
+
+    // Handle the results if the model is ready
+    if (results) { // results.corners, results.className, results.score
+        results.forEach(result => {
+            // invert cords to match the map
+            let corners = result.corners.map(cord => [cord[1], cord[0]]);
+            corners.push(corners[0]);
+            const boxFeature = new Feature({
+                geometry: new Polygon([corners]).transform('EPSG:4326', 'EPSG:3857'),
+                classIndex: result.className,
+                score: result.score
+            });
+            detectionSource.addFeature(boxFeature);
+        });
+    }
+    // run nms on all detections
+    if (nms) { nmsDetections() }
+    // Handle the labels if the model is ready
+    if (labels) { updateLabels(labels) }
+
+    if (error) { console.error('Error:', error) }
+};
+
+// run model
+function runModelOnTiles() {
+    let tiles = get_tiles_from_extent(predictionWindow);
+    tfjs_worker.postMessage({ tiles: tiles });
+    console.log(tiles);
+}

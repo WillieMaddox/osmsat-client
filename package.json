@@ -1,6 +1,6 @@
 {
   "name": "osmsat-client",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "OSMSAT viewer built on OpenLayers",
   "scripts": {
     "clean": "rimraf dist",
@@ -40,7 +40,8 @@
   "dependencies": {
     "jquery": "^3.7.1",
     "ol": "^10.3.1",
-    "ol-ext": "^4.0.24"
+    "ol-ext": "^4.0.24",
+    "@tensorflow/tfjs": "^4.19.0"
   },
   "repository": "https://github.com/WillieMaddox/osmsat-client.git",
   "author": "Willie Maddox",
