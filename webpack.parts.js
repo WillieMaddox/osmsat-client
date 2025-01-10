@@ -11,6 +11,12 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const ALL_FILES = glob.sync(path.join(__dirname, "src/*.js"));
 const APP_SOURCE = path.join(__dirname, "src");
 
+exports.ignorenodemodules = () => ({
+  watchOptions: {
+    ignored: '**/node_modules',
+  },
+});
+
 exports.page = ({ title } = {}) => ({
   plugins: [
     new HtmlWebpackPlugin({

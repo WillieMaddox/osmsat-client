@@ -8,12 +8,13 @@ const cssLoaders = [parts.autoprefix()]; //, parts.tailwind()];
 
 const commonConfig = merge([
   {
-    output: {
+      output: {
       // Tweak this to match your GitHub project name
       publicPath: "auto",
     },
   },
   // { entry: ["./src"] },
+  parts.ignorenodemodules(),
   parts.page({ title: "OSMSAT" }),
   parts.clean(),
   parts.loadJavaScript(),

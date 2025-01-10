@@ -8,6 +8,9 @@ module.exports = {
     // entry: {
     //     index: './src/index.js',
     // },
+    watchOptions: {
+        ignored: '**/node_modules',
+    },
     output: {
         // path: path.resolve(__dirname, 'dist'),
         publicPath: "",
