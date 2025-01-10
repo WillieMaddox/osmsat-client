@@ -24,6 +24,7 @@ import { singleClick } from 'ol/events/condition';
 
 // import VectorTileSource from 'ol/source/VectorTile';
 import { Vector as VectorSource, XYZ } from 'ol/source';
+import { ImageTile as ImageTileSource } from 'ol/source';
 import { TileDebug, OSM, BingMaps, StadiaMaps, GeoTIFF } from 'ol/source';
 import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer';
 import LayerGroup from 'ol/layer/Group';
@@ -148,20 +149,20 @@ const segmentStyle = new Style({
 });
 const segmentStyles = [segmentStyle];
 
-function toRad (x) {
+function toRad(x) {
     return x * Math.PI / 180.0
 }
-function toInt (x) {
+function toInt(x) {
     return ~~x
 }
-function mod (n, m) {
+function mod(n, m) {
     return ((n % m) + m) % m
 }
-function randomHexColor () {
+function randomHexColor() {
     const num = Math.floor(Math.random() * 16777215).toString(16)
     return '#' + String.prototype.repeat.call('0', 6 - num.length) + num
 }
-function convertHex (hex, opacity) {
+function convertHex(hex, opacity) {
     let rgb;
     hex = hex.replace('#', '');
     const idx = toInt(Math.floor(Math.random() * 3))
@@ -176,7 +177,7 @@ function convertHex (hex, opacity) {
     rgb[idx] = 255
     return rgb
 }
-function randomColor (opacity) {
+function randomColor(opacity) {
     const idx = toInt(Math.floor(Math.random() * 3));
     const r = idx === 0 ? 255 : toInt(Math.floor(Math.random() * 256));
     const g = idx === 1 ? 255 : toInt(Math.floor(Math.random() * 256));
@@ -187,7 +188,7 @@ function randomColor (opacity) {
         return [r, g, b]
     }
 }
-function deg2tile (lon_deg, lat_deg, zoom) {
+function deg2tile(lon_deg, lat_deg, zoom) {
     const lat_rad = toRad(lat_deg)
     const ztile = Math.round(zoom)
     const n = Math.pow(2, ztile)
@@ -195,7 +196,7 @@ function deg2tile (lon_deg, lat_deg, zoom) {
     const ytile = toInt((1.0 - Math.log(Math.tan(lat_rad) + (1 / Math.cos(lat_rad))) / Math.PI) / 2.0 * n)
     return [xtile, ytile, ztile]
 }
-function meter2pixel (mx, my, zoom) {
+function meter2pixel(mx, my, zoom) {
     let ires = 2 * Math.PI * 6378137 / 256
     let oshift = 2 * Math.PI * 6378137 / 2.0
     let ztile = Math.round(zoom)
@@ -206,7 +207,7 @@ function meter2pixel (mx, my, zoom) {
     ypixel = mapsize - ypixel
     return [xpixel, ypixel]
 }
-function meter2tile (mx, my, zoom) {
+function meter2tile(mx, my, zoom) {
     let ires = 2 * Math.PI * 6378137 / 256
     let oshift = 2 * Math.PI * 6378137 / 2.0
     let ztile = Math.round(zoom)
@@ -221,14 +222,14 @@ function meter2tile (mx, my, zoom) {
     let yrow = mod(ypixel, 256)
     return [xtile, ytile, ztile, xcol, yrow]
 }
-function coordinateFormatPIXEL (coord) {
+function coordinateFormatPIXEL(coord) {
     let zoom = view.getZoom()
     let xypixel = meter2pixel(coord[0], coord[1], zoom)
     let x = 'X: ' + xypixel[0]
     let y = 'Y: ' + xypixel[1]
     return [x, y].join('   ')
 }
-function coordinateFormatTILE (coord) {
+function coordinateFormatTILE(coord) {
     let zoom = view.getZoom()
     let xytile = meter2tile(coord[0], coord[1], zoom)
     let x = 'X: ' + xytile[0]
@@ -334,7 +335,7 @@ let thunderforestAttributions = [
 // });
 
 
-function ThunderForestSource (layer) {
+function ThunderForestSource(layer) {
     return new OSM({
         url: 'https://{a-c}.tile.thunderforest.com/' + layer + '/{z}/{x}/{y}.png' +
             '?apikey=' + process.env.THUNDERFOREST_API_KEY,
@@ -342,8 +343,8 @@ function ThunderForestSource (layer) {
     });
 }
 
-function GoogleSource (layer) {
-    return new XYZ({
+function GoogleSource(layer) {
+    return new ImageTileSource({
         url: 'https://mt{0-3}.google.com/vt/lyrs=' + layer + '&x={x}&y={y}&z={z}',
         // url: 'http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}',
         // url: 'https://khms0.googleapis.com/kh?&v=870&x={x}&y={y}&z={z}',
@@ -355,17 +356,20 @@ function GoogleSource (layer) {
     });
 }
 
-function BingSource (layer) {
+function BingSource(layer) {
     return new BingMaps({
         key: process.env.BINGMAPS_API_KEY,
         imagerySet: layer
     });
 }
 
-let sourceMapbox = new XYZ({
-    url: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90' +
-        '?access_token=' + process.env.MAPBOX_API_KEY,
-});
+function MapboxSource() {
+    return new ImageTileSource({
+        url: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90' +
+            '?access_token=' + process.env.MAPBOX_API_KEY,
+    });
+}
+
 
 let sourceOSM = new OSM();
 let sourceTFOutdoors = new ThunderForestSource('outdoors');
@@ -381,6 +385,8 @@ let sourceGoogleLabels = new GoogleSource('h');
 let sourceBingAerial = new BingSource('Aerial');
 let sourceBingRoads = new BingSource('Road');
 
+let sourceMapbox = new MapboxSource()
+
 // function handleTileLoad(event) {
 //     const tile = event.tile;
 //     const url = tile.src;
@@ -392,7 +398,7 @@ let sourceBingRoads = new BingSource('Road');
 // xyzsource.on('tileloadend', handleTileLoad);
 
 // TODO: Add Attribution for left hand layer.
-function StaticGroup () {
+function StaticGroup() {
     return new LayerGroup({
         layers: [
             new LayerGroup({
@@ -573,7 +579,13 @@ let rightgroup = new StaticGroup();
 // TODO: Wrap the mouse positions in a status control toggle
 let controls = [
     new Attribution(),
-    new ScaleLine(),
+    new ScaleLine({
+        // className: 'ol-scale-line',
+        // bar: true,
+        // steps: 4,
+        // text: true,
+        // minWidth: 140,
+    }),
     new MousePosition({
         target: document.getElementById('mouse-position'),
         coordinateFormat: function(coord) {
@@ -641,7 +653,7 @@ document.getElementsByClassName('ol-viewport')[0].appendChild($RightLayerLabelDi
 
 let swipe = new Swipe()
 
-function switchleft (layer) {
+function switchleft(layer) {
     let add_layers = [];
     let del_layers = [];
     if (layer.get('baseLayer')) {
@@ -665,7 +677,7 @@ function switchleft (layer) {
     }
     // console.log(' left ' + layer.get('title') + ' ' + layer.get('baseLayer') + ' ' + layer.get('visible'));
 }
-function switchright (layer) {
+function switchright(layer) {
     let add_layers = [];
     let del_layers = [];
     if (layer.get('baseLayer')) {
@@ -713,10 +725,10 @@ let layerswitcheright = new LayerSwitcher({
 });
 map.addControl(layerswitcheright);
 
-function initswipelayer ({layergroup, right, idx = 0} = {}) {
+function initswipelayer({ layergroup, right, idx = 0 } = {}) {
     // let layers = layergroup.getLayers().getArray()
     let layers = layergroup.getLayers().getArray()[0].getLayersArray()
-    let index = Math.max(0, layers.length - (1 + idx))
+    let index = mod(layers.length - (1 + idx), layers.length)
     let layer = layers[index]
     layer.setVisible(true)
     swipe.addLayer(layer, right);
@@ -727,8 +739,8 @@ function initswipelayer ({layergroup, right, idx = 0} = {}) {
     }
     // console.log(layer.get('title') + (right?" right":" left"));
 }
-initswipelayer({layergroup: leftgroup, right: false, idx: 10})
-initswipelayer({layergroup: rightgroup, right: true, idx: 1})
+initswipelayer({ layergroup: leftgroup, right: false, idx: -1 })
+initswipelayer({ layergroup: rightgroup, right: true, idx: 0 })
 map.addControl(swipe);
 
 // Main control bar
@@ -743,7 +755,6 @@ let debugLayer = new TileLayer({
     source: new TileDebug(),
 });
 map.addLayer(debugLayer);
-// Add control to toggle the debug layer.
 let debugLayerToggle = new Toggle({
     title: "Tiling Grid",
     className: "debug-toggle",
@@ -753,8 +764,8 @@ let debugLayerToggle = new Toggle({
 });
 mainbar.addControl(debugLayerToggle);
 
-/* Nested toobar with one control activated at once */
-var nestedbar = new Bar ({ toggleOne: true, group:true });
+/* Nested toolbar with one control activated at once */
+var nestedbar = new Bar ({ toggleOne: true, group: true });
 mainbar.addControl(nestedbar);
 
 layerswitcherleft.on('info', function (e) {
@@ -795,7 +806,6 @@ featurelist.on('dblclick', function(e) {
     map.getView().setZoom(map.getView().getZoom() - 1)
 });
 
-// Interactions
 // TODO: Add ability to drop in shapefiles.
 const dragAndDropInteraction = new DragAndDrop({
     formatConstructors: [
@@ -811,7 +821,6 @@ const dragAndDropInteraction = new DragAndDrop({
     ],
 });
 map.addInteraction(dragAndDropInteraction);
-
 dragAndDropInteraction.on('addfeatures', function (e) {
     // const randomcolor = randomColor()
     const vectorSource = new VectorSource({
@@ -820,12 +829,12 @@ dragAndDropInteraction.on('addfeatures', function (e) {
     const style = new Style({
         image: new CircleStyle({
             radius: 3,
-            stroke: new Stroke({color: randomColor(), width: 2}),
+            stroke: new Stroke({ color: randomColor(), width: 2 }),
         }),
-        stroke: new Stroke({color: randomColor(), width: 3}),
+        stroke: new Stroke({ color: randomColor(), width: 3 }),
         // stroke: new Stroke({color: 'rgb(255,165,0)', width: 3}),
     })
-    function DragAndDropVectorLayer () {
+    function DragAndDropVectorLayer() {
         return new VectorLayer({
             title: e.file.name,
             visible: true,
@@ -852,22 +861,21 @@ let searchLayer = new VectorLayer({
     style: new Style({
         image: new CircleStyle({
             radius: 5,
-            stroke: new Stroke({color: 'rgb(255,165,0)', width: 3}),
-            fill: new Fill({color: 'rgba(255,165,0,.3)'})
+            stroke: new Stroke({ color: 'rgb(255,165,0)', width: 3 }),
+            fill: new Fill({ color: 'rgba(255,165,0,.3)' })
         }),
-        stroke: new Stroke({color: 'rgb(255,165,0)', width: 3}),
-        fill: new Fill({color: 'rgba(255,165,0,.3)'})
+        stroke: new Stroke({ color: 'rgb(255,165,0)', width: 3 }),
+        fill: new Fill({ color: 'rgba(255,165,0,.3)' })
     })
 });
 map.addLayer(searchLayer);
-
 let search = new SearchNominatim({
     reverse: true,
     position: true,	// Search, with priority to geo position
     maxItems: 15
 });
 map.addControl(search);
-search.on('select', function(e) {
+search.on('select', function (e) {
 // console.log(e);
     searchLayer.getSource().clear();
     // Check if we get a geojson to describe the search
@@ -880,31 +888,30 @@ search.on('select', function(e) {
         let zoom = view.getZoomForResolution(resolution);
         let center = getCenter(f.getGeometry().getExtent());
         // redraw before zoom
-        setTimeout(function(){
+        setTimeout(function (){
             view.animate({
                 center: center,
-                zoom: Math.min (zoom, 16)
+                zoom: Math.min(zoom, 16)
             });
         }, 100);
     } else {
         map.getView().animate({
             center: e.coordinate,
-            zoom: Math.max (map.getView().getZoom(), 16)
+            zoom: Math.max(map.getView().getZoom(), 16)
         });
     }
 });
 
-// Add an on/off toggle for drawing bounding boxes
+// Add a toggle for drawing bounding boxes
 let bboxLayer = new VectorLayer({
     name: 'BBox',
     source: new VectorSource(),
     style: new Style({
-        stroke: new Stroke({color: 'rgb(0,76,151)', width: 3}),
+        stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
     }),
     visible: false
 });
 map.addLayer(bboxLayer);
-
 let bboxToggle = new Toggle({
     title: "Bounding Box",
     className: "bbox-toggle",
@@ -919,7 +926,6 @@ bboxToggle.on('change:active', function (e) {
     bboxLayer.setVisible(e.active);
 });
 nestedbar.addControl(bboxToggle);
-
 let bboxInteraction = new DrawRegular({
     source: bboxLayer.getSource(),
     sides: 4,
@@ -937,19 +943,17 @@ bboxInteraction.on('drawing', function (e) {
     lat1 = Math.max(c0[1], c1[1]);
     ll0 = createStringXY(6)([lon0, lat0])
     ll1 = createStringXY(6)([lon1, lat1])
-    document.getElementById('bbox').value = ll0+', '+ll1;
+    document.getElementById('bbox').value = ll0 + ', ' + ll1;
 });
 
-
+// Add a toggle for measureing length and areas.
 const typeSelect = document.getElementById('type');
 const showSegments = document.getElementById('segments');
 const clearPrevious = document.getElementById('clear');
-
 const measureSource = new VectorSource();
-const measureModify = new Modify({source: measureSource, style: modifyStyle});
+const measureModify = new Modify({ source: measureSource, style: modifyStyle });
 
 let tipPoint;
-
 function styleFunction(feature, segments, drawType, tip) {
     const styles = [];
     const geometry = feature.getGeometry();
@@ -1006,8 +1010,6 @@ const measureLayer = new VectorLayer({
     },
 });
 map.addLayer(measureLayer)
-
-// Add a taggle for measureing length and areas.
 let measureToggle = new Toggle({
     title: "Measure",
     className: "measure-toggle",
@@ -1024,11 +1026,9 @@ measureToggle.on('change:active', function (e) {
     clearPrevious.disabled = !e.active;
 });
 nestedbar.addControl(measureToggle);
-
 map.addInteraction(measureModify);
 
 let measureDraw; // global so we can remove it later
-
 function addInteraction() {
     const drawType = typeSelect.value;
     const activeTip =
@@ -1067,7 +1067,6 @@ typeSelect.onchange = function () {
 };
 addInteraction();
 measureDraw.setActive(measureToggle.getActive());
-
 showSegments.onchange = function () {
     measureLayer.changed();
     measureDraw.getOverlay().changed();
