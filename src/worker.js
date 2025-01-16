@@ -14,7 +14,7 @@ async function loadModel(MODEL_NAME) {
     const MODEL_URL = `${base_dir}/models/${MODEL_NAME}/model.json`;
     model = await tf.loadGraphModel(MODEL_URL);
     const dummyInput = tf.ones(model.inputs[0].shape);
-    const warmupResults = await model.predictAsync(dummyInput);
+    const warmupResults = model.predict(dummyInput);
     tf.dispose([warmupResults, dummyInput]);
     self.postMessage({ ready: true });
     // Also load the labels
