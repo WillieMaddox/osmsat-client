@@ -2,6 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 const Dotenv = require('dotenv-webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyPlugin = require("copy-webpack-plugin");
 const APP_SOURCE = path.join(__dirname, "src");
 
 module.exports = {
@@ -34,6 +35,11 @@ module.exports = {
             publicPath: '',
             inject: 'body',
             // hash: true
+        }),
+        new CopyPlugin({
+            patterns: [
+                { from: "models", to: "models" },
+            ],
         }),
     ],
 };

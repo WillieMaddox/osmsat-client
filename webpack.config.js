@@ -3,15 +3,23 @@ const webpack = require("webpack");
 const { merge } = require("webpack-merge");
 const { mode } = require("webpack-nano/argv");
 const parts = require("./webpack.parts");
+const CopyPlugin = require("copy-webpack-plugin");
 
 const cssLoaders = [parts.autoprefix()]; //, parts.tailwind()];
 
 const commonConfig = merge([
   {
-      output: {
+    output: {
       // Tweak this to match your GitHub project name
       publicPath: "auto",
     },
+    plugins: [
+      new CopyPlugin({
+        patterns: [
+          { from: "models", to: "models" },
+        ],
+      }),
+    ],
   },
   // { entry: ["./src"] },
   parts.ignorenodemodules(),
