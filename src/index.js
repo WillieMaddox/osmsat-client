@@ -729,14 +729,26 @@ let debugLayerToggle = new Toggle({
 });
 mainbar.addControl(debugLayerToggle);
 
-/* Nested toolbar with one control activated at once */
-var nestedbar = new Bar ({ toggleOne: true, group: true });
-mainbar.addControl(nestedbar);
-
 layerswitcherleft.on('info', function (e) {
     if (!e.layer.get('baseLayer')) {
         featurelist.setFeatures(e.layer.getSource())
     }
+});
+// Select control
+let featurelist = new FeatureList({
+    title: 'Detections',
+    collapsed: true,
+});
+map.addControl(featurelist);
+
+featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon')
+featurelist.on('select', function(e) {
+    select.getFeatures().clear();
+    select.getFeatures().push(e.feature);
+});
+featurelist.on('dblclick', function(e) {
+    map.getView().fit(e.feature.getGeometry().getExtent())
+    map.getView().setZoom(map.getView().getZoom() - 1)
 });
 
 // Select  interaction
@@ -754,22 +766,6 @@ select.on('select', function(e) {
     }
 });
 
-// Select control
-let featurelist = new FeatureList({
-    title: 'Communes',
-    collapsed: true,
-});
-map.addControl(featurelist);
-
-featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon')
-featurelist.on('select', function(e) {
-    select.getFeatures().clear();
-    select.getFeatures().push(e.feature);
-});
-featurelist.on('dblclick', function(e) {
-    map.getView().fit(e.feature.getGeometry().getExtent())
-    map.getView().setZoom(map.getView().getZoom() - 1)
-});
 
 // TODO: Add ability to drop in shapefiles.
 const dragAndDropInteraction = new DragAndDrop({
@@ -866,6 +862,10 @@ search.on('select', function (e) {
         });
     }
 });
+
+/* Nested toolbar with one control activated at once */
+var nestedbar = new Bar ({ toggleOne: true, group: true });
+mainbar.addControl(nestedbar);
 
 // Add a toggle for drawing bounding boxes
 let bboxLayer = new VectorLayer({
