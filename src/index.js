@@ -46,7 +46,6 @@ import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
 import { mod, randomColor, meter2pixel, meter2tile2, meter2tile4 } from './utils';
-import { updateLabels } from './utils';
 import * as tf from '@tensorflow/tfjs';
 
 const style = new Style({
@@ -123,6 +122,15 @@ const segmentStyle = new Style({
     }),
 });
 const segmentStyles = [segmentStyle];
+
+// Labels and Colors
+let labels = [];
+let colors = [];
+function updateLabels(newLabels) {
+    labels = newLabels;
+    colors = Array.from({ length: labels.length }, () => randomColor(0.1));
+}
+
 // Function to create text style with hardcoded settings
 const createTextStyle = function (feature, resolution) {
     const maxResolution = 2400;
@@ -736,18 +744,12 @@ let debugLayerToggle = new Toggle({
 });
 mainbar.addControl(debugLayerToggle);
 
-layerswitcherleft.on('info', function (e) {
-    if (!e.layer.get('baseLayer')) {
-        featurelist.setFeatures(e.layer.getSource())
-    }
-});
 // Select control
 let featurelist = new FeatureList({
     title: 'Detections',
     collapsed: true,
 });
 map.addControl(featurelist);
-
 featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon')
 featurelist.on('select', function(e) {
     select.getFeatures().clear();
@@ -757,15 +759,11 @@ featurelist.on('dblclick', function(e) {
     map.getView().fit(e.feature.getGeometry().getExtent())
     map.getView().setZoom(map.getView().getZoom() - 1)
 });
-
-// Select  interaction
 const select = new Select({
     hitTolerance: 5,
     condition: singleClick
 });
 map.addInteraction(select);
-
-// Select feature when click on the reference index
 select.on('select', function(e) {
     const f = e.selected[0];
     if (f) {
@@ -773,6 +771,11 @@ select.on('select', function(e) {
     }
 });
 
+layerswitcherleft.on('info', function (e) {
+    if (!e.layer.get('baseLayer')) {
+        featurelist.setFeatures(e.layer.getSource())
+    }
+});
 
 // TODO: Add ability to drop in shapefiles.
 const dragAndDropInteraction = new DragAndDrop({
@@ -1128,7 +1131,7 @@ function get_tiles_from_extent(box) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    tfjs_worker.postMessage({ model: "tfjs_web_model_path", type: "model_type" });
+    tfjs_worker.postMessage({ model: "tfjs_web_model_path", task: "model_task"});
     document.body.classList.add('hideOpacity')
 }, { passive: true });
 

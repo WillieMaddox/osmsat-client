@@ -2,14 +2,6 @@
 // Constants
 const RE = 6378137; // Earth radius
 
-// Labels
-let labels = [];
-let colors = [];
-export function updateLabels(newLabels) {
-    labels = newLabels;
-    colors = Array.from({ length: labels.length }, () => randomColor(0.1));
-}
-
 function toRad(x) {
     return x * Math.PI / 180.0
 }

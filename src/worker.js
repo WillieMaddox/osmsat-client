@@ -2,28 +2,28 @@ import * as tf from '@tensorflow/tfjs';
 import { getCorners, tilePixelToWorld } from './utils.js';
 
 let base_dir = null;
-let numClass = null;
+let num_classes = null;
 let labels = null;
 let model = null;
-let type = null;
+let task = null;
 const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
-async function loadModel(MODEL_NAME) {
+async function loadModel(model_name) {
     // load model
-    const MODEL_URL = `${base_dir}/models/${MODEL_NAME}/model.json`;
-    model = await tf.loadGraphModel(MODEL_URL);
+    const model_url = `${base_dir}/models/${model_name}/model.json`;
+    model = await tf.loadGraphModel(model_url);
     const dummyInput = tf.ones(model.inputs[0].shape);
     const warmupResults = model.predict(dummyInput);
     tf.dispose([warmupResults, dummyInput]);
     self.postMessage({ ready: true });
     // Also load the labels
-    const CLASSES_URL = `${base_dir}/models/${MODEL_NAME}/metadata.yaml`;
-    const response = await fetch(CLASSES_URL);
+    const metadata_url = `${base_dir}/models/${model_name}/metadata.yaml`;
+    const response = await fetch(metadata_url);
     const classesText = await response.text();
     labels = getClassNames(classesText);
-    numClass = labels.length;
-    console.log(`${MODEL_NAME} model loaded with ${numClass} classes`);
+    num_classes = labels.length;
+    console.log(`${model_name} model loaded with ${num_classes} classes`);
     self.postMessage({ labels: labels });
 }
 
@@ -99,9 +99,9 @@ async function processTile(tile, isCombo = false) {
 
     // run the detections type on the image data
     let boxes, scores, classes;
-    if (type === "hbb") {
+    if (task === "hbb") {
         [boxes, scores, classes] = await detect(imageData, model);
-    } else if (type === "obb") {
+    } else if (task === "obb") {
         [boxes, scores, classes] = await detectOBB(imageData, model);
     }
 
@@ -115,7 +115,7 @@ function convertDetections(boxes, scores, classes, tile, size = 640) {
     const classesArray = Array.from(classes);
 
     return classesArray.map((classIndex, i) => {
-        const box = boxesArray.slice(i * (type === "hbb" ? 4 : 5), (i + 1) * (type === "hbb" ? 4 : 5));
+        const box = boxesArray.slice(i * (task === "hbb" ? 4 : 5), (i + 1) * (task === "hbb" ? 4 : 5));
         const [x1, y1, x2, y2, angle] = box;
         const x_center = (x1 + x2) / 2;
         const y_center = (y1 + y2) / 2;
@@ -186,7 +186,7 @@ self.onmessage = async function (event) {
     if (event.data.model) {
         self.postMessage({ ready: false });
         await loadModel(event.data.model);
-        type = event.data.type;
+        task = event.data.type;
         self.postMessage({ ready: true });
     }
 
@@ -238,7 +238,7 @@ export const detect = async (source, model) => {
     });
 
     const [scores, classes] = tf.tidy(() => {
-        const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0);
+        const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]).squeeze(0);
         return [rawScores.max(1), rawScores.argMax(1)];
     });
 
@@ -268,7 +268,7 @@ export const detectOBB = async (source, model) => {
     });
 
     const [scores, classes] = tf.tidy(() => {
-        const rawScores = transRes.slice([0, 0, 4], [-1, -1, numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
+        const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
         return [rawScores.max(1), rawScores.argMax(1)];
     });
 
