@@ -14,7 +14,7 @@ async function loadModel(MODEL_NAME) {
     const MODEL_URL = `${base_dir}/models/${MODEL_NAME}/model.json`;
     model = await tf.loadGraphModel(MODEL_URL);
     const dummyInput = tf.ones(model.inputs[0].shape);
-    const warmupResults = model.predict(dummyInput);
+    const warmupResults = await model.predictAsync(dummyInput);
     tf.dispose([warmupResults, dummyInput]);
     self.postMessage({ ready: true });
     // Also load the labels
@@ -200,10 +200,7 @@ self.onmessage = async function (event) {
     }
 
     // initialize base_dir
-    if (event.data.url) {
-        base_dir = event.data.url
-        console.log(base_dir)
-    }
+    if (event.data.url) { base_dir = event.data.url }
 
     if (event.data.debugTile) { // debug tile
         const tile = event.data.debugTile;
