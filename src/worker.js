@@ -1,3 +1,4 @@
+import yaml from 'js-yaml';
 import * as tf from '@tensorflow/tfjs';
 import { getCorners, tilePixelToWorld } from './utils.js';
 
@@ -6,6 +7,7 @@ let num_classes = null;
 let labels = null;
 let model = null;
 let task = null;
+let imgsz = null;
 const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
@@ -20,33 +22,14 @@ async function loadModel(model_name) {
     // Also load the labels
     const metadata_url = `${base_dir}/models/${model_name}/metadata.yaml`;
     const response = await fetch(metadata_url);
-    const classesText = await response.text();
-    labels = getClassNames(classesText);
-    num_classes = labels.length;
+    const text = await response.text();
+    const metadata = yaml.load(text);
+    labels = metadata.names;
+    num_classes = Object.entries(labels).length;
+    imgsz = metadata.imgsz;
+    task = metadata.task;
     console.log(`${model_name} model loaded with ${num_classes} classes`);
     self.postMessage({ labels: labels });
-}
-
-function getClassNames(fileContent) {
-    const lines = fileContent.split('\n');
-    const names = [];
-    let isNamesSection = false;
-    for (let line of lines) {
-        if (line.trim() === 'names:') {
-            isNamesSection = true;
-            continue;
-        }
-        if (isNamesSection) {
-            line = line.trim();
-            const match = line.match(/^\s*\d+:\s*(.+)$/);
-            if (match) {
-                names.push(match[1]);
-            } else if (line === '') {
-                break; // Terminate the section on an empty line
-            }
-        }
-    }
-    return names;
 }
 
 async function fetchImage(url) {
@@ -88,10 +71,10 @@ async function processTile(tile, isCombo = false) {
 
     // get image data of the combines tile or a single tile
     let imageData;
-    let size = 640;
+    let size = 256;
     if (isCombo) {
         imageData = await combineImages(tile);
-        size = 320; // double the scaling when converting 4 tiles to 1
+        size = 128; // double the scaling when converting 4 tiles to 1
     } else {
         const img = await fetchImage(tile.url);
         imageData = getImageData(img);
@@ -99,7 +82,7 @@ async function processTile(tile, isCombo = false) {
 
     // run the detections type on the image data
     let boxes, scores, classes;
-    if (task === "hbb") {
+    if (task === "detect") {
         [boxes, scores, classes] = await detect(imageData, model);
     } else if (task === "obb") {
         [boxes, scores, classes] = await detectOBB(imageData, model);
@@ -115,7 +98,7 @@ function convertDetections(boxes, scores, classes, tile, size = 640) {
     const classesArray = Array.from(classes);
 
     return classesArray.map((classIndex, i) => {
-        const box = boxesArray.slice(i * (task === "hbb" ? 4 : 5), (i + 1) * (task === "hbb" ? 4 : 5));
+        const box = boxesArray.slice(i * (task === "detect" ? 4 : 5), (i + 1) * (task === "detect" ? 4 : 5));
         const [x1, y1, x2, y2, angle] = box;
         const x_center = (x1 + x2) / 2;
         const y_center = (y1 + y2) / 2;
@@ -127,7 +110,8 @@ function convertDetections(boxes, scores, classes, tile, size = 640) {
         return {
             corners: worldCorners,
             score: scoresArray[i],
-            className: classIndex
+            classIndex: classIndex,
+            label: labels[classIndex]
         };
     });
 }
@@ -160,23 +144,36 @@ function checkAdjacentTiles(tiles, duplicates = true) {
 self.onmessage = async function (event) {
     if (event.data.tiles) {
         const tiles = Object.values(event.data.tiles);
-        const { combos, extraTiles } = checkAdjacentTiles(tiles);
-        for (const combo of combos) {
-            try {
-                const comboResults = await processTile(combo, true);
-                self.postMessage({ results: comboResults });
-            } catch (error) {
-                console.log(error);
-                self.postMessage({ error: 'Error processing combo', combo });
+        if (imgsz[0] === 512 && imgsz[1] === 512) {
+            const {combos, extraTiles} = checkAdjacentTiles(tiles);
+            for (const combo of combos) {
+                try {
+                    const comboResults = await processTile(combo, true);
+                    self.postMessage({results: comboResults});
+                } catch (error) {
+                    console.log(error);
+                    self.postMessage({error: 'Error processing combo', combo});
+                }
+            }
+            for (const tile of extraTiles) {
+                try {
+                    const tileResults = await processTile(tile);
+                    self.postMessage({results: tileResults});
+                } catch (error) {
+                    console.log(error);
+                    self.postMessage({error: 'Error processing tile', tile});
+                }
             }
         }
-        for (const tile of extraTiles) {
-            try {
-                const tileResults = await processTile(tile);
-                self.postMessage({ results: tileResults });
-            } catch (error) {
-                console.log(error);
-                self.postMessage({ error: 'Error processing tile', tile });
+        if (imgsz[0] === 256 && imgsz[1] === 256) {
+            for (const tile of tiles) {
+                try {
+                    const tileResults = await processTile(tile);
+                    self.postMessage({results: tileResults});
+                } catch (error) {
+                    console.log(error);
+                    self.postMessage({error: 'Error processing tile', tile});
+                }
             }
         }
         // run nms on all the results
@@ -186,7 +183,6 @@ self.onmessage = async function (event) {
     if (event.data.model) {
         self.postMessage({ ready: false });
         await loadModel(event.data.model);
-        task = event.data.type;
         self.postMessage({ ready: true });
     }
 
@@ -201,7 +197,7 @@ self.onmessage = async function (event) {
     }
 };
 
-const preprocess = (source, modelWidth, modelHeight) => {
+const preprocess = (source) => {
     return tf.tidy(() => {
         const img = tf.browser.fromPixels(source);
         const [h, w] = img.shape.slice(0, 2);
@@ -214,7 +210,7 @@ const preprocess = (source, modelWidth, modelHeight) => {
 
         return [
             tf.image
-                .resizeBilinear(imgPadded, [modelWidth, modelHeight])
+                .resizeBilinear(imgPadded, [imgsz[0], imgsz[1]])
                 .div(255.0)
                 .expandDims(0)
         ];
@@ -223,7 +219,7 @@ const preprocess = (source, modelWidth, modelHeight) => {
 
 export const detect = async (source, model) => {
     tf.engine().startScope();
-    const [input] = preprocess(source, 640, 640);
+    const [input] = preprocess(source);
     const res = model.predict(input);
     const transRes = res.transpose([0, 2, 1]);
 
@@ -252,7 +248,7 @@ export const detect = async (source, model) => {
 
 export const detectOBB = async (source, model) => {
     tf.engine().startScope();
-    const [input] = preprocess(source, 640, 640);
+    const [input] = preprocess(source);
     const res = model.predict(input);
     const transRes = res.transpose([0, 2, 1]);
 

@@ -128,7 +128,7 @@ let labels = [];
 let colors = [];
 function updateLabels(newLabels) {
     labels = newLabels;
-    colors = Array.from({ length: labels.length }, () => randomColor(0.1));
+    colors = Array.from({ length: Object.entries(labels).length }, () => randomColor(0.1));
 }
 
 // Function to create text style with hardcoded settings
@@ -1131,7 +1131,7 @@ function get_tiles_from_extent(box) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    tfjs_worker.postMessage({ model: "tfjs_web_model_path", task: "model_task"});
+    tfjs_worker.postMessage({ model: "tfjs_web_model_path" });
     document.body.classList.add('hideOpacity')
 }, { passive: true });
 
@@ -1144,14 +1144,15 @@ tfjs_worker.onmessage = function (event) {
     const { results, labels, error, nms } = event.data;
 
     // Handle the results if the model is ready
-    if (results) { // results.corners, results.className, results.score
+    if (results) { // results.corners, results.classIndex, results.label, results.score
         results.forEach(result => {
             // invert cords to match the map
             let corners = result.corners.map(cord => [cord[1], cord[0]]);
             corners.push(corners[0]);
             const boxFeature = new Feature({
                 geometry: new Polygon([corners]).transform('EPSG:4326', 'EPSG:3857'),
-                classIndex: result.className,
+                classIndex: result.classIndex,
+                label: result.label,
                 score: result.score
             });
             detectionSource.addFeature(boxFeature);
