@@ -324,6 +324,13 @@ let sourceBingRoads = new BingSource('Road');
 
 let sourceMapbox = new MapboxSource()
 
+const google_tile_to_url = {};
+function handleTileLoad(event) {
+    google_tile_to_url[event.tile.tileCoord] = event.tile.getData().src;
+}
+sourceGoogleSatellite.on('tileloadend', handleTileLoad);
+
+
 // TODO: Add Attribution for left hand layer.
 function StaticGroup() {
     return new LayerGroup({
@@ -1113,7 +1120,8 @@ function get_tiles_from_extent(box) {
     let tiles = [];
     for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
         for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
-            tiles.push({ x, y, z });
+            const url = google_tile_to_url[[z, x, y].join(',')];
+            tiles.push({ x, y, z, url });
         }
     }
     return tiles;

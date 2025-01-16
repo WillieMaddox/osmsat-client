@@ -49,11 +49,6 @@ function getClassNames(fileContent) {
     return names;
 }
 
-function genGoogleUrl(x, y, z) {
-    const randomSuffix = Math.floor(Math.random() * 4);
-    return `https://mt${randomSuffix}.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}`;
-}
-
 async function fetchImage(url) {
     const response = await fetch(url);
     const blob = await response.blob();
@@ -68,7 +63,7 @@ function getImageData(img) {
 }
 
 async function combineImages(tiles) {
-    const tileImages = await Promise.all(tiles.map(tile => fetchImage(genGoogleUrl(tile.x, tile.y, tile.z))));
+    const tileImages = await Promise.all(tiles.map(tile => fetchImage(tile.url)));
     const tileWidth = tileImages[0].width;
     const tileHeight = tileImages[0].height;
     const canvas = new OffscreenCanvas(2 * tileWidth, 2 * tileHeight);
@@ -83,9 +78,7 @@ async function combineImages(tiles) {
 }
 
 async function debugTile(tile) {
-    const { x, y, z } = tile;
-    const url = genGoogleUrl(x, y, z);
-    const img = await fetchImage(url);
+    const img = await fetchImage(tile.url);
     const imageData = getImageData(img);
     const [boxes, scores, classes] = await detect(imageData, model);
     return convertDetections(boxes, scores, classes, tile);
@@ -100,9 +93,7 @@ async function processTile(tile, isCombo = false) {
         imageData = await combineImages(tile);
         size = 320; // double the scaling when converting 4 tiles to 1
     } else {
-        const { x, y, z } = tile;
-        const url = genGoogleUrl(x, y, z);
-        const img = await fetchImage(url);
+        const img = await fetchImage(tile.url);
         imageData = getImageData(img);
     }
 
