@@ -11,7 +11,8 @@ import Map from 'ol/Map';
 import View from 'ol/View';
 import { transform } from 'ol/proj';
 import { getCenter } from 'ol/extent';
-import { LineString, Point } from 'ol/geom';
+import { Feature } from 'ol';
+import { LineString, Point, Polygon } from 'ol/geom';
 import { getArea, getLength } from 'ol/sphere';
 // import { createXYZ } from 'ol/tilegrid';
 import { ATTRIBUTION } from 'ol/source/OSM'
