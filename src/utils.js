@@ -64,17 +64,16 @@ export function meter2tile4(mx, my, zoom) {
     return [xtile, ytile, xcol, yrow]
 }
 
-export function imageCoord2WorldCoords0(img_x, img_y, tile_x, tile_y, zoom) {
+export function imageCoord2WorldCoords(img_x, img_y, tile_x, tile_y, zoom) {
     // Get the starting coordinates of the tile
     const tile_size = 256; // 256 for google and bing maps, 512 for mapbox
-    const img_size = 640; // size of the image
     const initialResolution = 2 * Math.PI * RE / tile_size;
     const res = initialResolution / Math.pow(2, zoom);
     const originShift = 2 * Math.PI * RE / 2.0;
 
     // tile to world pixels
-    const px = (tile_x + img_x / img_size) * tile_size;
-    let py = (tile_y + img_y / img_size) * tile_size;
+    const px = tile_x * tile_size + img_x;
+    let py = tile_y * tile_size + img_y;
 
     // world pixels to meters
     py = (tile_size << zoom) - py;  // Google -> TMS
@@ -100,7 +99,7 @@ function tileZXYToLatLon(x, y, zoomLevel) {
     const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
     return { lat, lon };
 }
-export function imageCoord2WorldCoords(img_x, img_y, tile_x, tile_y, zoom) {
+export function imageCoord2WorldCoords0(img_x, img_y, tile_x, tile_y, zoom) {
     // Get the starting coordinates of the tile
     const startingCoords = tileZXYToLatLon(tile_x, tile_y, zoom);
     const img_size = 640; // size of the image

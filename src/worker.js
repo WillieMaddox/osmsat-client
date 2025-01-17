@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 import * as tf from '@tensorflow/tfjs';
-import { getCorners, tilePixelToWorld } from './utils.js';
+import { getCorners, imageCoord2WorldCoords } from './utils.js';
 
 let base_dir = null;
 let num_classes = null;
@@ -71,15 +71,12 @@ async function processTile(tile, isCombo = false) {
 
     // get image data of the combines tile or a single tile
     let imageData;
-    let size = 256;
     if (isCombo) {
         imageData = await combineImages(tile);
-        size = 128; // double the scaling when converting 4 tiles to 1
     } else {
         const img = await fetchImage(tile.url);
         imageData = getImageData(img);
     }
-
     // run the detections type on the image data
     let boxes, scores, classes;
     if (task === "detect") {
@@ -87,11 +84,10 @@ async function processTile(tile, isCombo = false) {
     } else if (task === "obb") {
         [boxes, scores, classes] = await detectOBB(imageData, model);
     }
-
-    return convertDetections(boxes, scores, classes, tile, size);
+    return convertDetections(boxes, scores, classes, tile);
 }
 
-function convertDetections(boxes, scores, classes, tile, size = 640) {
+function convertDetections(boxes, scores, classes, tile) {
     const { x: x_tile, y: y_tile, z: zoom } = Array.isArray(tile) ? tile[0] : tile;
     const boxesArray = Array.from(boxes);
     const scoresArray = Array.from(scores);
@@ -106,9 +102,9 @@ function convertDetections(boxes, scores, classes, tile, size = 640) {
         const height = y2 - y1;
         const corners = getCorners(x_center, y_center, width, height, angle || 0);
         // console.log({ box: box, corners: corners, info: [x_center, y_center, width, height], class: classIndex });
-        const worldCorners = corners.map(([x, y]) => tilePixelToWorld(x, y, size, x_tile, y_tile, zoom));
+        const worldCoords = corners.map(([x, y]) => imageCoord2WorldCoords0(x, y, x_tile, y_tile, zoom));
         return {
-            corners: worldCorners,
+            corners: worldCoords,
             score: scoresArray[i],
             classIndex: classIndex,
             label: labels[classIndex]
