@@ -118,16 +118,28 @@ function convertDetections(boxes, scores, classes, tile, size = 640) {
 
 function checkAdjacentTiles(tiles, duplicates = true) {
     const combos = [];
-    const tileCoords = tiles.map(({ x, y, z }) => ({ x, y, z }));
-    const tileSet = new Set(tileCoords.map(({ x, y, z }) => `${x},${y},${z}`));
-    tileCoords.forEach(({ x, y, z }) => {
+
+    const urlmap = tiles.reduce((acc, obj) => {
+        // Use a string representation of (x, y, z) as the key
+        const key = `${obj.x},${obj.y},${obj.z}`;
+        acc[key] = obj.url;
+        return acc;
+        }, {});
+
+    const tileSet = new Set(tiles.map(({ x, y, z }) => `${x},${y},${z}`));
+    tiles.forEach(({ x, y, z }) => {
         if (
             tileSet.has(`${x},${y},${z}`) &&
             tileSet.has(`${x + 1},${y},${z}`) &&
             tileSet.has(`${x},${y + 1},${z}`) &&
             tileSet.has(`${x + 1},${y + 1},${z}`)
         ) {
-            combos.push([{ x, y, z }, { x: x + 1, y, z }, { x, y: y + 1, z }, { x: x + 1, y: y + 1, z }]);
+            combos.push([
+                { x, y, z, url: urlmap[`${x},${y},${z}`] },
+                { x: x + 1, y, z, url: urlmap[`${x + 1},${y},${z}`] },
+                { x, y: y + 1, z, url: urlmap[`${x},${y + 1},${z}`] },
+                { x: x + 1, y: y + 1, z, url: urlmap[`${x + 1},${y + 1},${z}`] }
+            ]);
             if (!duplicates) {
                 tileSet.delete(`${x},${y},${z}`);
                 tileSet.delete(`${x + 1},${y},${z}`);
@@ -136,16 +148,14 @@ function checkAdjacentTiles(tiles, duplicates = true) {
             }
         }
     });
-    const comboTilesSet = new Set(combos.flat().map(({ x, y, z }) => `${x},${y},${z}`));
-    const extraTiles = tiles.filter(({ x, y, z }) => !comboTilesSet.has(`${x},${y},${z}`));
-    return { combos, extraTiles };
+    return combos;
 }
 
 self.onmessage = async function (event) {
     if (event.data.tiles) {
         const tiles = Object.values(event.data.tiles);
         if (imgsz[0] === 512 && imgsz[1] === 512) {
-            const {combos, extraTiles} = checkAdjacentTiles(tiles);
+            const combos = checkAdjacentTiles(tiles);
             for (const combo of combos) {
                 try {
                     const comboResults = await processTile(combo, true);
@@ -153,15 +163,6 @@ self.onmessage = async function (event) {
                 } catch (error) {
                     console.log(error);
                     self.postMessage({error: 'Error processing combo', combo});
-                }
-            }
-            for (const tile of extraTiles) {
-                try {
-                    const tileResults = await processTile(tile);
-                    self.postMessage({results: tileResults});
-                } catch (error) {
-                    console.log(error);
-                    self.postMessage({error: 'Error processing tile', tile});
                 }
             }
         }
