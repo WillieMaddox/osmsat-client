@@ -102,7 +102,7 @@ function convertDetections(boxes, scores, classes, tile) {
         const height = y2 - y1;
         const corners = getCorners(x_center, y_center, width, height, angle || 0);
         // console.log({ box: box, corners: corners, info: [x_center, y_center, width, height], class: classIndex });
-        const worldCoords = corners.map(([x, y]) => imageCoord2WorldCoords0(x, y, x_tile, y_tile, zoom));
+        const worldCoords = corners.map(([x, y]) => imageCoord2WorldCoords(x, y, x_tile, y_tile, zoom));
         return {
             corners: worldCoords,
             score: scoresArray[i],
