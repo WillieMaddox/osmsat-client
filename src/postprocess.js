@@ -1,4 +1,8 @@
 
+import { Feature } from "ol";
+import { Polygon } from "ol/geom";
+import { meter2pixel, getCorners, WorldPixels2Meters } from "./utils";
+
 class BoundingBox {
     constructor(box, shiftAmount = [0, 0]) {
         if (box[0] < 0 || box[1] < 0 || box[2] < 0 || box[3] < 0) {
@@ -390,4 +394,38 @@ export class NMMPostprocess extends PostprocessPredictions {
 
         return selectedObjectPredictions;
     }
+}
+
+export function convertFCstoOPs(featureCollection, zoom) {
+    const objectPredictions = []
+    featureCollection.forEach(feature => {
+        const [minx, miny, maxx, maxy] = feature.getGeometry().getExtent();
+        const [px0, py0] = meter2pixel(minx, maxy, zoom);
+        const [px1, py1] = meter2pixel(maxx, miny, zoom);
+        const bbox = [px0, py0, px1, py1];
+        const op = new ObjectPrediction({
+            bbox: bbox,
+            category_id: feature.get('classIndex'),
+            category_name: feature.get('label'),
+            score: feature.get('score'),
+        });
+        objectPredictions.push(op);
+    });
+    return objectPredictions;
+}
+export function convertOPstoFCs(objectPredictions, zoom) {
+    const featureCollection = []
+    objectPredictions.forEach(op => {
+        const worldPixels = getCorners(op.bbox.toVocBBox());
+        const meters = worldPixels.map(([x, y]) => WorldPixels2Meters(x, y, zoom));
+        meters.push(meters[0]);
+        const feature = new Feature({
+            geometry: new Polygon([meters]),
+            classIndex: op.category.id,
+            label: op.category.name,
+            score: op.score.value,
+        });
+        featureCollection.push(feature);
+    });
+    return featureCollection;
 }

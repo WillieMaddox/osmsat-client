@@ -82,6 +82,18 @@ export function imageCoord2Meters(img_x, img_y, tile_x, tile_y, zoom) {
 
     return [mx, my]
 }
+export function WorldPixels2Meters(px, py, zoom) {
+    const tile_size = 256; // 256 for google and bing maps, 512 for mapbox
+    const initialResolution = 2 * Math.PI * RE / tile_size;
+    const res = initialResolution / Math.pow(2, zoom);
+    const originShift = 2 * Math.PI * RE / 2.0;
+
+    py = (tile_size << zoom) - py;  // Google -> TMS
+    const mx = px * res - originShift;
+    const my = py * res - originShift;
+
+    return [mx, my]
+}
 function tileZXYToLatLon(x, y, zoomLevel) {
     // EPSG:3857
     const z = Math.trunc(zoomLevel);

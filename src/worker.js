@@ -147,9 +147,18 @@ function checkAdjacentTiles(tiles, duplicates = true) {
     return combos;
 }
 
+function getViewExtent(tiles) {
+    const { x: x_tile0, y: y_tile0, z: _ } = Array.isArray(tiles) ? tiles[0] : tiles;
+    const { x: x_tile1, y: y_tile1, z: zoom } = Array.isArray(tiles) ? tiles[tiles.length - 1] : tiles;
+    const [mx0, my1] = imageCoord2Meters(0, 0, x_tile0, y_tile0, zoom);
+    const [mx1, my0] = imageCoord2Meters(0, 0, x_tile1 + 1, y_tile1 + 1, zoom);
+    return [mx0, my0, mx1, my1];
+}
+
 self.onmessage = async function (event) {
     if (event.data.tiles) {
         const tiles = Object.values(event.data.tiles);
+        const viewExtent = getViewExtent(tiles);
         if (imgsz[0] === 512 && imgsz[1] === 512) {
             const combos = checkAdjacentTiles(tiles);
             for (const combo of combos) {
@@ -174,7 +183,9 @@ self.onmessage = async function (event) {
             }
         }
         // run nms on all the results
-        self.postMessage({ nms: true });
+        // self.postMessage({ nms: true });
+        // run non-maximum matching on all the results
+        self.postMessage({ nmm_extent: viewExtent });
     }
 
     if (event.data.model) {

@@ -47,6 +47,7 @@ import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
 import {toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4} from './utils';
 import * as tf from '@tensorflow/tfjs';
+import {NMMPostprocess, convertOPstoFCs, convertFCstoOPs} from './postprocess';
 
 const style = new Style({
     fill: new Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
@@ -1061,6 +1062,7 @@ map.addLayer(detectionLayer);
 rightgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 leftgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 
+const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
 async function nmsDetections() {
     // create boxes, scores, and classes from feature values
     let boxes = [];
@@ -1114,6 +1116,14 @@ async function nmsDetections() {
     gatheredClasses.dispose();
 }
 
+async function nmmWrapper(vectorSource, nmm_extent, zoom) {
+    const featuresInExtent = vectorSource.getFeaturesInExtent(nmm_extent);
+    const objectPredictions = convertFCstoOPs(featuresInExtent, zoom);
+    const objectPredictions2 = nmm_postprocess.call(objectPredictions);
+    const featureCollection2 = convertOPstoFCs(objectPredictions2, zoom);
+    vectorSource.removeFeatures(featuresInExtent);
+    vectorSource.addFeatures(featureCollection2);
+}
 function get_tiles_from_extent(box) {
     let z = Math.round(view.getZoom())
     let [x0, y0] = meter2tile2(box[0], box[1], z);
@@ -1141,7 +1151,7 @@ tfjs_worker.postMessage({ url: document.URL });
 
 // Listen for messages from the worker
 tfjs_worker.onmessage = function (event) {
-    const { results, labels, error, nms } = event.data;
+    const { results, labels, error, nms, nmm_extent } = event.data;
 
     // Handle the results if the model is ready
     if (results) { // results.corners, results.classIndex, results.label, results.score
@@ -1159,6 +1169,8 @@ tfjs_worker.onmessage = function (event) {
     }
     // run nms on all detections
     if (nms) { nmsDetections() }
+    // run nmm on all detections
+    if (nmm_extent) { nmmWrapper(detectionSource, nmm_extent, Math.round(view.getZoom())) }
     // Handle the labels if the model is ready
     if (labels) { updateLabels(labels) }
 
