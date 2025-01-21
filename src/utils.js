@@ -64,7 +64,7 @@ export function meter2tile4(mx, my, zoom) {
     return [xtile, ytile, xcol, yrow]
 }
 
-export function imageCoord2WorldCoords(img_x, img_y, tile_x, tile_y, zoom) {
+export function imageCoord2Meters(img_x, img_y, tile_x, tile_y, zoom) {
     // Get the starting coordinates of the tile
     const tile_size = 256; // 256 for google and bing maps, 512 for mapbox
     const initialResolution = 2 * Math.PI * RE / tile_size;
@@ -80,12 +80,7 @@ export function imageCoord2WorldCoords(img_x, img_y, tile_x, tile_y, zoom) {
     const mx = px * res - originShift;
     const my = py * res - originShift;
 
-    // meters to lat lon
-    let lat_deg = (my / originShift) * 180.0;
-    lat_deg = 180 / Math.PI * (2 * Math.atan(Math.exp(lat_deg * Math.PI / 180.0)) - Math.PI / 2.0);
-    const lon_deg = (mx / originShift) * 180.0;
-
-    return [lat_deg, lon_deg];
+    return [mx, my]
 }
 function tileZXYToLatLon(x, y, zoomLevel) {
     // EPSG:3857

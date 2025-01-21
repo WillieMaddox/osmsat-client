@@ -1146,11 +1146,10 @@ tfjs_worker.onmessage = function (event) {
     // Handle the results if the model is ready
     if (results) { // results.corners, results.classIndex, results.label, results.score
         results.forEach(result => {
-            // invert cords to match the map
-            let corners = result.corners.map(cord => [cord[1], cord[0]]);
+            let corners = result.corners.map(cord => [cord[0], cord[1]]);
             corners.push(corners[0]);
             const boxFeature = new Feature({
-                geometry: new Polygon([corners]).transform('EPSG:4326', 'EPSG:3857'),
+                geometry: new Polygon([corners]),
                 classIndex: result.classIndex,
                 label: result.label,
                 score: result.score

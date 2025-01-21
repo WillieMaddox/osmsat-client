@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 import * as tf from '@tensorflow/tfjs';
-import { getCorners, imageCoord2WorldCoords } from './utils.js';
+import { getCorners, imageCoord2Meters } from './utils.js';
 
 let base_dir = null;
 let num_classes = null;
@@ -102,9 +102,9 @@ function convertDetections(boxes, scores, classes, tile) {
         const height = y2 - y1;
         const corners = getCorners(x_center, y_center, width, height, angle || 0);
         // console.log({ box: box, corners: corners, info: [x_center, y_center, width, height], class: classIndex });
-        const worldCoords = corners.map(([x, y]) => imageCoord2WorldCoords(x, y, x_tile, y_tile, zoom));
+        const meters = corners.map(([x, y]) => imageCoord2Meters(x, y, x_tile, y_tile, zoom));
         return {
-            corners: worldCoords,
+            corners: meters,
             score: scoresArray[i],
             classIndex: classIndex,
             label: labels[classIndex]
