@@ -45,7 +45,7 @@ import FeatureList from "ol-ext/control/FeatureList";
 import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
-import {toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4} from './utils';
+import {toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4, getCorners, WorldPixels2Meters} from './utils';
 import * as tf from '@tensorflow/tfjs';
 import {NMMPostprocess, convertOPstoFCs, convertFCstoOPs} from './postprocess';
 
@@ -1063,14 +1063,17 @@ rightgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 leftgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
-async function nmsDetections() {
+async function nmsDetections(featuresInExtent) {
     // create boxes, scores, and classes from feature values
     let boxes = [];
     let scores = [];
     let classes = [];
-    detectionSource.getFeatures().forEach((feature) => {
-        const extent = feature.getGeometry().getExtent();
-        boxes.push([extent[0], extent[1], extent[2], extent[3]]);
+    featuresInExtent.forEach((feature) => {
+        const [minx, miny, maxx, maxy] = feature.getGeometry().getExtent();
+        const [px0, py0] = meter2pixel(minx, maxy, zoom);
+        const [px1, py1] = meter2pixel(maxx, miny, zoom);
+        const bbox = [px0, py0, px1, py1];
+        boxes.push(bbox);
         scores.push(feature.get('score'));
         classes.push(feature.get('classIndex'));
     });
@@ -1092,20 +1095,21 @@ async function nmsDetections() {
     const classesData = await gatheredClasses.array();
 
     // replace the current features with the nms results
-    detectionSource.clear();
+    const featureCollection = [];
     for (let i = 0; i < scoresData.length; i++) {
         const bbox = boxesData[i];
         const score = scoresData[i];
         const cls = classesData[i];
-        const feature = new Feature(new Polygon([[
-            [bbox[0], bbox[1]],
-            [bbox[0], bbox[3]],
-            [bbox[2], bbox[3]],
-            [bbox[2], bbox[1]],
-            [bbox[0], bbox[1]]
-        ]]));
-        feature.setProperties({ score: score, classIndex: cls });
-        detectionSource.addFeature(feature);
+        const worldPixels = getCorners(bbox);
+        const meters = worldPixels.map(([x, y]) => WorldPixels2Meters(x, y, zoom));
+        meters.push(meters[0]);
+        const feature = new Feature({
+            geometry: new Polygon([meters]),
+            classIndex: cls,
+            label: labels[cls],
+            score: score,
+        });
+        featureCollection.push(feature);
     }
 
     // dispose tensors to free memory
@@ -1114,15 +1118,17 @@ async function nmsDetections() {
     gatheredBoxes.dispose();
     gatheredScores.dispose();
     gatheredClasses.dispose();
-}
 
+    return featureCollection
+}
 async function nmmWrapper(vectorSource, nmm_extent, zoom) {
     const featuresInExtent = vectorSource.getFeaturesInExtent(nmm_extent);
     const objectPredictions = convertFCstoOPs(featuresInExtent, zoom);
     const objectPredictions2 = nmm_postprocess.call(objectPredictions);
     const featureCollection2 = convertOPstoFCs(objectPredictions2, zoom);
+    const featureCollection3 = await nmsDetections(featureCollection2);
     vectorSource.removeFeatures(featuresInExtent);
-    vectorSource.addFeatures(featureCollection2);
+    vectorSource.addFeatures(featureCollection3);
 }
 function get_tiles_from_extent(box) {
     let z = Math.round(view.getZoom())
