@@ -5,7 +5,7 @@ const RE = 6378137; // Earth radius
 function toRad(x) {
     return x * Math.PI / 180.0
 }
-function toInt(x) {
+export function toInt(x) {
     return ~~x
 }
 export function mod(n, m) {
@@ -44,8 +44,8 @@ export function meter2pixel(mx, my, zoom) {
     const ires = 2 * Math.PI * RE / 256
     const oshift = 2 * Math.PI * RE / 2.0
     const res = ires / Math.pow(2, zoom)
-    const xpixel = toInt((mx + oshift) / res)
-    const ypixel = toInt((my + oshift) / res)
+    const xpixel = (mx + oshift) / res
+    const ypixel = (my + oshift) / res
     const mapsize = 256 << zoom
     return [xpixel, mapsize - ypixel]
 }
@@ -59,8 +59,8 @@ export function meter2tile4(mx, my, zoom) {
     const [xpixel, ypixel] = meter2pixel(mx, my, zoom)
     const xtile = toInt(xpixel / 256)
     const ytile = toInt(ypixel / 256)
-    const xcol = mod(xpixel, 256)
-    const yrow = mod(ypixel, 256)
+    const xcol = mod(toInt(xpixel), 256)
+    const yrow = mod(toInt(ypixel), 256)
     return [xtile, ytile, xcol, yrow]
 }
 

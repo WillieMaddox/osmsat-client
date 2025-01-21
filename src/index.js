@@ -45,7 +45,7 @@ import FeatureList from "ol-ext/control/FeatureList";
 import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
-import { mod, randomColor, meter2pixel, meter2tile2, meter2tile4 } from './utils';
+import {toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4} from './utils';
 import * as tf from '@tensorflow/tfjs';
 
 const style = new Style({
@@ -170,9 +170,9 @@ const polygonStyleFunction = (feature, resolution) => {
 };
 
 function coordinateFormatPIXEL(coord, zoom) {
-    const xypixel = meter2pixel(coord[0], coord[1], zoom)
-    const x = 'X: ' + xypixel[0]
-    const y = 'Y: ' + xypixel[1]
+    const xypixel = meter2pixel(coord[0], coord[1], zoom);
+    const x = 'X: ' + toInt(xypixel[0]);
+    const y = 'Y: ' + toInt(xypixel[1]);
     return [x, y].join('   ')
 }
 function coordinateFormatTILE(coord, zoom) {
