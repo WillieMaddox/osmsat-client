@@ -161,11 +161,18 @@ export function tilePixelToWorld(px, py, img_size, x_tile, y_tile, zoom) {
     const rel_y = (py / img_size) * (tile_bounds.lat_max - tile_bounds.lat_min) + tile_bounds.lat_min;
     return [rel_y, rel_x];
 }
-export function getCorners(x_center, y_center, width, height, radians) {
+export function getCorners(box) {
     // Function to calculate the 4 corners of the rotated bounding box
     // angle goes from -pi/2 to pi/2 with 0 being the horizontal axis in radians
-    const cos = Math.cos(radians);
-    const sin = Math.sin(radians);
+
+    const [x1, y1, x2, y2, angle] = box;
+    const x_center = (x1 + x2) / 2;
+    const y_center = (y1 + y2) / 2;
+    const width = x2 - x1;
+    const height = y2 - y1;
+
+    const cos = Math.cos(angle || 0);
+    const sin = Math.sin(angle || 0);
 
     // Half dimensions
     const halfWidth = width / 2;

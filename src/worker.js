@@ -95,19 +95,14 @@ function convertDetections(boxes, scores, classes, tile) {
 
     return classesArray.map((classIndex, i) => {
         const box = boxesArray.slice(i * (task === "detect" ? 4 : 5), (i + 1) * (task === "detect" ? 4 : 5));
-        const [x1, y1, x2, y2, angle] = box;
-        const x_center = (x1 + x2) / 2;
-        const y_center = (y1 + y2) / 2;
-        const width = x2 - x1;
-        const height = y2 - y1;
-        const corners = getCorners(x_center, y_center, width, height, angle || 0);
+        const corners = getCorners(box);
         // console.log({ box: box, corners: corners, info: [x_center, y_center, width, height], class: classIndex });
         const meters = corners.map(([x, y]) => imageCoord2Meters(x, y, x_tile, y_tile, zoom));
         return {
             corners: meters,
-            score: scoresArray[i],
             classIndex: classIndex,
-            label: labels[classIndex]
+            label: labels[classIndex],
+            score: scoresArray[i],
         };
     });
 }

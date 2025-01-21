@@ -1181,5 +1181,4 @@ tfjs_worker.onmessage = function (event) {
 function runModelOnTiles() {
     let tiles = get_tiles_from_extent(predictionWindow);
     tfjs_worker.postMessage({ tiles: tiles });
-    console.log(tiles);
 }
