@@ -46,7 +46,40 @@ function getImageData(img) {
     ctx.drawImage(img, 0, 0);
     return ctx.getImageData(0, 0, img.width, img.height, { colorSpace: 'srgb' });
 }
+function checkAdjacentTiles(tiles, duplicates = true) {
+    const combos = [];
 
+    const urlmap = tiles.reduce((acc, obj) => {
+        // Use a string representation of (x, y, z) as the key
+        const key = `${obj.x},${obj.y},${obj.z}`;
+        acc[key] = obj.url;
+        return acc;
+    }, {});
+
+    const tileSet = new Set(tiles.map(({ x, y, z }) => `${x},${y},${z}`));
+    tiles.forEach(({ x, y, z }) => {
+        if (
+            tileSet.has(`${x},${y},${z}`) &&
+            tileSet.has(`${x + 1},${y},${z}`) &&
+            tileSet.has(`${x},${y + 1},${z}`) &&
+            tileSet.has(`${x + 1},${y + 1},${z}`)
+        ) {
+            combos.push([
+                { x, y, z, url: urlmap[`${x},${y},${z}`] },
+                { x: x + 1, y, z, url: urlmap[`${x + 1},${y},${z}`] },
+                { x, y: y + 1, z, url: urlmap[`${x},${y + 1},${z}`] },
+                { x: x + 1, y: y + 1, z, url: urlmap[`${x + 1},${y + 1},${z}`] }
+            ]);
+            if (!duplicates) {
+                tileSet.delete(`${x},${y},${z}`);
+                tileSet.delete(`${x + 1},${y},${z}`);
+                tileSet.delete(`${x},${y + 1},${z}`);
+                tileSet.delete(`${x + 1},${y + 1},${z}`);
+            }
+        }
+    });
+    return combos;
+}
 async function combineImages(tiles) {
     const tileImages = await Promise.all(tiles.map(tile => fetchImage(tile.url)));
     const tileWidth = tileImages[0].width;
@@ -107,41 +140,6 @@ function convertDetections(boxes, scores, classes, tile) {
             score: scoresArray[i],
         };
     });
-}
-
-function checkAdjacentTiles(tiles, duplicates = true) {
-    const combos = [];
-
-    const urlmap = tiles.reduce((acc, obj) => {
-        // Use a string representation of (x, y, z) as the key
-        const key = `${obj.x},${obj.y},${obj.z}`;
-        acc[key] = obj.url;
-        return acc;
-        }, {});
-
-    const tileSet = new Set(tiles.map(({ x, y, z }) => `${x},${y},${z}`));
-    tiles.forEach(({ x, y, z }) => {
-        if (
-            tileSet.has(`${x},${y},${z}`) &&
-            tileSet.has(`${x + 1},${y},${z}`) &&
-            tileSet.has(`${x},${y + 1},${z}`) &&
-            tileSet.has(`${x + 1},${y + 1},${z}`)
-        ) {
-            combos.push([
-                { x, y, z, url: urlmap[`${x},${y},${z}`] },
-                { x: x + 1, y, z, url: urlmap[`${x + 1},${y},${z}`] },
-                { x, y: y + 1, z, url: urlmap[`${x},${y + 1},${z}`] },
-                { x: x + 1, y: y + 1, z, url: urlmap[`${x + 1},${y + 1},${z}`] }
-            ]);
-            if (!duplicates) {
-                tileSet.delete(`${x},${y},${z}`);
-                tileSet.delete(`${x + 1},${y},${z}`);
-                tileSet.delete(`${x},${y + 1},${z}`);
-                tileSet.delete(`${x + 1},${y + 1},${z}`);
-            }
-        }
-    });
-    return combos;
 }
 
 function getViewExtent(tiles) {
