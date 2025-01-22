@@ -708,23 +708,23 @@ mainbar.addControl(predictButton);
 let predictionWindow;
 map.on('movestart', function(e) {
     map.set('moving', true, true);
+    predictButton.setHtml('<i class="fa-solid fa-bolt" style="opacity: 0.5;"></i>');
     predictButton.setDisable(true);
-    predictButton.setHtml('<i class="fa" style="opacity: 0.5;">P</i>');
 });
 map.on('loadstart', function(e) {
     map.set('loading', true, true);
+    predictButton.setHtml('<i class="fa-solid fa-bolt" style="opacity: 0.5;"></i>');
     predictButton.setDisable(true);
-    predictButton.setHtml('<i class="fa" style="opacity: 0.5;">P</i>');
 });
 map.on('moveend', function(e) {
     map.set('moving', false, false);
     predictionWindow = e.frameState.extent;
-    predictButton.setHtml('<i class="fa">P</i>');
+    predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
     predictButton.setDisable(false);
 });
 map.on('loadend', function(e) {
     map.set('loading', false, false);
-    predictButton.setHtml('<i class="fa">P</i>');
+    predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
     predictButton.setDisable(false);
 });
 
@@ -739,7 +739,7 @@ map.addLayer(debugLayer);
 let debugLayerToggle = new Toggle({
     title: "Tiling Grid",
     className: "debug-toggle",
-    html: '<i class="fa">D</i>',
+    html: '<i class="fa-solid fa-bug"></i>',
     active: false,
     onToggle: function(active) { debugLayer.setVisible(active) }
 });
@@ -891,7 +891,7 @@ map.addLayer(bboxLayer);
 let bboxToggle = new Toggle({
     title: "Bounding Box",
     className: "bbox-toggle",
-    html: '<i class="fa">B</i>',
+    html: '<i class="fa-solid fa-vector-square"></i>',
     interaction: new Select(),
     active: false,
 });
@@ -989,7 +989,7 @@ map.addLayer(measureLayer)
 let measureToggle = new Toggle({
     title: "Measure",
     className: "measure-toggle",
-    html: '<i class="fa">M</i>',
+    html: '<i class="fa-solid fa-ruler"></i>',
     active: false,
 });
 measureToggle.on('change:active', function (e) {
