@@ -131,7 +131,6 @@ function updateLabels(newLabels) {
     labels = newLabels;
     colors = Array.from({ length: Object.entries(labels).length }, () => randomColor(0.1));
 }
-
 // Function to create text style with hardcoded settings
 const createTextStyle = function (feature, resolution) {
     const maxResolution = 2400;
@@ -698,7 +697,7 @@ let predictButton = new Button({
     className: "predict-button",
     html: '<i class="fa">P</i>',
     disabled: true,
-    handleClick: function (e) {
+    handleClick: function () {
         runModelOnTiles();
         // modelElement.style.display = active ? 'flex' : 'none';
     }
@@ -722,7 +721,7 @@ map.on('moveend', function(e) {
     predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
     predictButton.setDisable(false);
 });
-map.on('loadend', function(e) {
+map.on('loadend', function (e) {
     map.set('loading', false, false);
     predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
     predictButton.setDisable(false);
@@ -1130,21 +1129,6 @@ async function nmmWrapper(vectorSource, nmm_extent, zoom) {
     vectorSource.removeFeatures(featuresInExtent);
     vectorSource.addFeatures(featureCollection3);
 }
-function get_tiles_from_extent(box) {
-    let z = Math.round(view.getZoom())
-    let [x0, y0] = meter2tile2(box[0], box[1], z);
-    let [x1, y1] = meter2tile2(box[2], box[3], z);
-
-    // Collect all tiles within the bounding box
-    let tiles = [];
-    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
-        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
-            const url = google_tile_to_url[[z, x, y].join(',')];
-            tiles.push({ x, y, z, url });
-        }
-    }
-    return tiles;
-}
 
 document.addEventListener('DOMContentLoaded', function () {
     tfjs_worker.postMessage({ model: "tfjs_web_model_path" });
@@ -1175,7 +1159,7 @@ tfjs_worker.onmessage = function (event) {
     }
     // run nms on all detections
     if (nms) { nmsDetections() }
-    // run nmm on all detections
+    // run nmm (and nms) on all detections
     if (nmm_extent) { nmmWrapper(detectionSource, nmm_extent, Math.round(view.getZoom())) }
     // Handle the labels if the model is ready
     if (labels) { updateLabels(labels) }
@@ -1183,8 +1167,23 @@ tfjs_worker.onmessage = function (event) {
     if (error) { console.error('Error:', error) }
 };
 
-// run model
+function get_tiles_from_extent(box) {
+    let z = Math.round(view.getZoom())
+    let [x0, y0] = meter2tile2(box[0], box[1], z);
+    let [x1, y1] = meter2tile2(box[2], box[3], z);
+
+    // Collect all tiles within the view extent
+    let tiles = [];
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+            const url = google_tile_to_url[[z, x, y].join(',')];
+            tiles.push({ x, y, z, url });
+        }
+    }
+    return tiles;
+}
+
 function runModelOnTiles() {
-    let tiles = get_tiles_from_extent(predictionWindow);
+    const tiles = get_tiles_from_extent(predictionWindow);
     tfjs_worker.postMessage({ tiles: tiles });
 }

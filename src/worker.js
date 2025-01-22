@@ -3,11 +3,12 @@ import * as tf from '@tensorflow/tfjs';
 import { getCorners, imageCoord2Meters } from './utils.js';
 
 let base_dir = null;
+let batch_size = null;
 let num_classes = null;
 let labels = null;
 let model = null;
-let task = null;
 let imgsz = null;
+let task = null;
 const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
@@ -19,16 +20,17 @@ async function loadModel(model_name) {
     const warmupResults = model.predict(dummyInput);
     tf.dispose([warmupResults, dummyInput]);
     self.postMessage({ ready: true });
-    // Also load the labels
+    // load model metadata
     const metadata_url = `${base_dir}/models/${model_name}/metadata.yaml`;
     const response = await fetch(metadata_url);
     const text = await response.text();
     const metadata = yaml.load(text);
     labels = metadata.names;
     num_classes = Object.entries(labels).length;
+    batch_size = metadata.batch;
     imgsz = metadata.imgsz;
     task = metadata.task;
-    console.log(`${model_name} model loaded with ${num_classes} classes`);
+    console.log(`${model_name} model loaded with ${num_classes} classes and ${batch_size} batch size`);
     self.postMessage({ labels: labels });
 }
 
@@ -179,7 +181,7 @@ self.onmessage = async function (event) {
         }
         // run nms on all the results
         // self.postMessage({ nms: true });
-        // run non-maximum matching on all the results
+        // postprocess all results (NMM, NMS, etc.)
         self.postMessage({ nmm_extent: viewExtent });
     }
 
@@ -242,9 +244,9 @@ export const detect = async (source, model) => {
     });
 
     const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
-    const boxes_data = boxes.gather(nms, 0).dataSync();
-    const scores_data = scores.gather(nms, 0).dataSync();
-    const classes_data = classes.gather(nms, 0).dataSync();
+    const boxes_data = boxes.gather(nms).dataSync();
+    const scores_data = scores.gather(nms).dataSync();
+    const classes_data = classes.gather(nms).dataSync();
 
     return [boxes_data, scores_data, classes_data];
 };

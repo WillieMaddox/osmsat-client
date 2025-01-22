@@ -6,9 +6,9 @@
     "clean": "rimraf dist",
     "serve": "webpack serve --config webpack.dev.js",
     "serve2": "webpack serve --mode development",
+    "build:dev": "wp --mode development",
     "build": "webpack --config webpack.prod.js",
     "build2": "webpack --mode production --json > stats.json",
-    "build:dev": "wp --mode development",
     "build:prod": "wp --mode production"
   },
   "devDependencies": {
