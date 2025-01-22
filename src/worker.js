@@ -188,10 +188,15 @@ self.onmessage = async function (event) {
         await loadModel(event.data.model);
         self.postMessage({ ready: true });
     }
-
-    // initialize base_dir
-    if (event.data.url) { base_dir = event.data.url }
-
+    if (event.data.url) {
+        const url = event.data.url;
+        if (url.endsWith('.html')) {
+            const lastSlashIndex = url.lastIndexOf('/');
+            base_dir = url.substring(0, lastSlashIndex);
+        } else {
+            base_dir = url
+        }
+    }
     if (event.data.debugTile) { // debug tile
         const tile = event.data.debugTile;
         const debugResults = await debugTile(tile);
