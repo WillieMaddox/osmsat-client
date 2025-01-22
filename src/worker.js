@@ -154,6 +154,7 @@ function getViewExtent(tiles) {
 
 self.onmessage = async function (event) {
     if (event.data.tiles) {
+        const t0 = performance.now();
         const tiles = Object.values(event.data.tiles);
         const viewExtent = getViewExtent(tiles);
         if (imgsz[0] === 512 && imgsz[1] === 512) {
@@ -181,6 +182,8 @@ self.onmessage = async function (event) {
         }
         // postprocess all results (NMM, NMS, etc.)
         self.postMessage({ nmm_extent: viewExtent });
+        const t1 = performance.now();
+        console.log('Detection finished in :', (t1 - t0) / 1000, 'seconds');
     }
 
     if (event.data.model) {
