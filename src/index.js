@@ -1141,7 +1141,7 @@ tfjs_worker.postMessage({ url: document.URL });
 
 // Listen for messages from the worker
 tfjs_worker.onmessage = function (event) {
-    const { results, labels, error, nms, nmm_extent } = event.data;
+    const { results, labels, error, nmm_extent } = event.data;
 
     // Handle the results if the model is ready
     if (results) { // results.corners, results.classIndex, results.label, results.score
@@ -1157,8 +1157,6 @@ tfjs_worker.onmessage = function (event) {
             detectionSource.addFeature(boxFeature);
         });
     }
-    // run nms on all detections
-    if (nms) { nmsDetections() }
     // run nmm (and nms) on all detections
     if (nmm_extent) { nmmWrapper(detectionSource, nmm_extent, Math.round(view.getZoom())) }
     // Handle the labels if the model is ready

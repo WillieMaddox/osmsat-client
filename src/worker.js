@@ -179,8 +179,6 @@ self.onmessage = async function (event) {
                 }
             }
         }
-        // run nms on all the results
-        // self.postMessage({ nms: true });
         // postprocess all results (NMM, NMS, etc.)
         self.postMessage({ nmm_extent: viewExtent });
     }
