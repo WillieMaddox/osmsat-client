@@ -82,9 +82,9 @@ async function processTile(tile, isCombo = false) {
     // run the detections type on the image data
     let boxes, scores, classes;
     if (task === "detect") {
-        [boxes, scores, classes] = await detect(imageData, model);
+        [boxes, scores, classes] = await detect(imageData);
     } else if (task === "obb") {
-        [boxes, scores, classes] = await detectOBB(imageData, model);
+        [boxes, scores, classes] = await detectOBB(imageData);
     }
     return convertDetections(boxes, scores, classes, tile);
 }
@@ -228,25 +228,21 @@ const preprocess = (source) => {
     });
 };
 
-export const detect = async (source, model) => {
+export const detect = async (source) => {
     tf.engine().startScope();
     const [input] = preprocess(source);
     const res = model.predict(input);
-    const transRes = res.transpose([0, 2, 1]);
 
-    const boxes = tf.tidy(() => {
+    const [boxes, scores, classes] = tf.tidy(() => {
+        const transRes = res.transpose([0, 2, 1]);
         const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
         const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
         const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2));
         const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2));
         const x2 = tf.add(x1, w);
         const y2 = tf.add(y1, h);
-        return tf.concat([x1, y1, x2, y2], 2).squeeze();
-    });
-
-    const [scores, classes] = tf.tidy(() => {
         const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]).squeeze(0);
-        return [rawScores.max(1), rawScores.argMax(1)];
+        return [tf.concat([x1, y1, x2, y2], 2).squeeze(), rawScores.max(1), rawScores.argMax(1)];
     });
 
     const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
@@ -257,13 +253,13 @@ export const detect = async (source, model) => {
     return [boxes_data, scores_data, classes_data];
 };
 
-export const detectOBB = async (source, model) => {
+export const detectOBB = async (source) => {
     tf.engine().startScope();
     const [input] = preprocess(source);
     const res = model.predict(input);
-    const transRes = res.transpose([0, 2, 1]);
 
-    const boxes = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
+    const [boxes, scores, classes] = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
+        const transRes = res.transpose([0, 2, 1]);
         const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
         const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
         const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
@@ -271,12 +267,8 @@ export const detectOBB = async (source, model) => {
         const x2 = tf.add(x1, w); // x2
         const y2 = tf.add(y1, h); // y2
         const rotation = transRes.slice([0, 0, transRes.shape[2] - 1], [-1, -1, 1]); // rotation, between -π/2 to π/2 radians
-        return tf.concat([x1, y1, x2, y2, rotation], 2).squeeze();
-    });
-
-    const [scores, classes] = tf.tidy(() => {
         const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
-        return [rawScores.max(1), rawScores.argMax(1)];
+        return [tf.concat([x1, y1, x2, y2, rotation], 2).squeeze(), rawScores.max(1), rawScores.argMax(1)];
     });
 
     // subselect the first 4 values of the box (x1, y1, x2, y2) for nms
