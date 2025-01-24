@@ -1069,7 +1069,7 @@ rightgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 leftgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
-async function nmsDetections(featuresInExtent) {
+async function nmsDetections(featuresInExtent, zoom) {
     // create boxes, scores, and classes from feature values
     let boxes = [];
     let scores = [];
@@ -1127,12 +1127,13 @@ async function nmsDetections(featuresInExtent) {
 
     return featureCollection
 }
-async function nmmWrapper(vectorSource, nmm_extent, zoom) {
+async function nmmWrapper(vectorSource, nmm_extent) {
+    const zoom = Math.round(view.getZoom());
     const featuresInExtent = vectorSource.getFeaturesInExtent(nmm_extent);
     const objectPredictions = convertFCstoOPs(featuresInExtent, zoom);
     const objectPredictions2 = nmm_postprocess.call(objectPredictions);
     const featureCollection2 = convertOPstoFCs(objectPredictions2, zoom);
-    const featureCollection3 = await nmsDetections(featureCollection2);
+    const featureCollection3 = await nmsDetections(featureCollection2, zoom);
     vectorSource.removeFeatures(featuresInExtent);
     vectorSource.addFeatures(featureCollection3);
 }
@@ -1173,7 +1174,7 @@ tfjs_worker.onmessage = function (event) {
         });
     }
     // run nmm (and nms) on all detections
-    if (nmm_extent) { nmmWrapper(detectionSource, nmm_extent, Math.round(view.getZoom())) }
+    if (nmm_extent) { nmmWrapper(detectionSource, nmm_extent) }
     // Handle the labels if the model is ready
     if (labels) { updateLabels(labels) }
 
