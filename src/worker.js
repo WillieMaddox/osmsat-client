@@ -19,7 +19,6 @@ async function loadModel(model_name) {
     const dummyInput = tf.ones(model.inputs[0].shape);
     const warmupResults = model.predict(dummyInput);
     tf.dispose([warmupResults, dummyInput]);
-    self.postMessage({ ready: true });
     // load model metadata
     const metadata_url = `${base_dir}/models/${model_name}/metadata.yaml`;
     const response = await fetch(metadata_url);
@@ -33,13 +32,11 @@ async function loadModel(model_name) {
     console.log(`${model_name} model loaded with ${num_classes} classes and ${batch_size} batch size`);
     self.postMessage({ labels: labels });
 }
-
 async function fetchImage(url) {
     const response = await fetch(url);
     const blob = await response.blob();
     return createImageBitmap(blob);
 }
-
 function getImageData(img) {
     const canvas = new OffscreenCanvas(img.width, img.height);
     const ctx = canvas.getContext('2d');
@@ -101,7 +98,6 @@ async function debugTile(tile) {
     const [boxes, scores, classes] = await detect(imageData, model);
     return convertDetections(boxes, scores, classes, tile);
 }
-
 async function processTile(tile, isCombo = false) {
 
     // get image data of the combines tile or a single tile

@@ -695,7 +695,7 @@ map.addControl(mainbar);
 let predictButton = new Button({
     title: "Predict",
     className: "predict-button",
-    html: '<i class="fa">P</i>',
+    html: '<i class="fa-solid fa-bolt" style="opacity: 0.5;"></i>',
     disabled: true,
     handleClick: function () {
         runModelOnTiles();
@@ -1141,8 +1141,16 @@ tfjs_worker.postMessage({ url: document.URL });
 
 // Listen for messages from the worker
 tfjs_worker.onmessage = function (event) {
-    const { results, labels, error, nmm_extent } = event.data;
+    const { ready, results, labels, error, nmm_extent } = event.data;
 
+    if (ready === true) {
+        predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
+        predictButton.setDisable(false);
+    }
+    if (ready === false) {
+        predictButton.setHtml('<i class="fa-solid fa-bolt" style="opacity: 0.5;"></i>');
+        predictButton.setDisable(true);
+    }
     // Handle the results if the model is ready
     if (results) { // results.corners, results.classIndex, results.label, results.score
         results.forEach(result => {
