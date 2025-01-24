@@ -552,14 +552,14 @@ let controls = [
     }),
     new MousePosition({
         coordinateFormat: function(coord) {
-            return 'PIXEL: ' + coordinateFormatPIXEL(coord, Math.round(view.getZoom()));
+            return 'PIXEL: ' + coordinateFormatPIXEL(coord, intZoom);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionPIXEL',
         projection: 'EPSG:900913',
     }),
     new MousePosition({
         coordinateFormat: function(coord) {
-            return 'TILE: ' + coordinateFormatTILE(coord, Math.round(view.getZoom()));
+            return 'TILE: ' + coordinateFormatTILE(coord, intZoom);
         },
         className: 'ol-custom-mouse-position ol-custom-mouse-positionTILE',
         projection: 'EPSG:900913',
@@ -570,7 +570,14 @@ let view = new View({
     center: transform(center, 'EPSG:4326', 'EPSG:3857'),
     zoom: zoom
 });
-
+let intZoom = view.getZoom();
+view.on('change:resolution', function(e) {
+    const oldR = e.oldValue
+    const newR = e.target.getResolution()
+    if (Math.abs(newR - oldR) < 5e-4) {
+        intZoom = sourceGoogleSatellite.getTileGrid().getZForResolution(newR);
+    }
+})
 let map = new Map({
     target: 'map',
     view: view,
