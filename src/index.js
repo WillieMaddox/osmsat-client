@@ -590,7 +590,6 @@ let map = new Map({
     maxTilesLoading: 24
 });
 
-map.setProperties({'loading': true, 'moving': true}, true);
 
 let $LeftLayerLabelDiv = document.createElement('div')
 $LeftLayerLabelDiv.id = 'LeftLayerLabel'
@@ -712,26 +711,8 @@ let predictButton = new Button({
 mainbar.addControl(predictButton);
 
 let predictionWindow;
-map.on('movestart', function(e) {
-    map.set('moving', true, true);
-    predictButton.setHtml('<i class="fa-solid fa-bolt" style="opacity: 0.5;"></i>');
-    predictButton.setDisable(true);
-});
-map.on('loadstart', function(e) {
-    map.set('loading', true, true);
-    predictButton.setHtml('<i class="fa-solid fa-bolt" style="opacity: 0.5;"></i>');
-    predictButton.setDisable(true);
-});
 map.on('moveend', function(e) {
-    map.set('moving', false, false);
     predictionWindow = e.frameState.extent;
-    predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
-    predictButton.setDisable(false);
-});
-map.on('loadend', function (e) {
-    map.set('loading', false, false);
-    predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
-    predictButton.setDisable(false);
 });
 
 // An overlay that stay on top
