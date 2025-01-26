@@ -574,13 +574,6 @@ let view = new View({
     zoom: zoom
 });
 let intZoom = view.getZoom();
-view.on('change:resolution', function(e) {
-    const oldR = e.oldValue
-    const newR = e.target.getResolution()
-    if (Math.abs(newR - oldR) < 5e-4) {
-        intZoom = sourceGoogleSatellite.getTileGrid().getZForResolution(newR);
-    }
-})
 let map = new Map({
     target: 'map',
     view: view,
@@ -770,6 +763,10 @@ map.on('moveend', function(e) {
     predictionWindow = e.frameState.extent;
 });
 
+map.on('rendercomplete', function (e) {
+    const res = map.getView().getResolution();
+    intZoom = swipe.leftBaseLayer.getSource().getTileGrid().getZForResolution(res);
+});
 // An overlay that stay on top
 let debugLayer = new TileLayer({
     title: "Debug Tiles",
