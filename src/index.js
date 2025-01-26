@@ -569,7 +569,6 @@ let controls = [
         projection: 'EPSG:900913',
     }),
 ];
-
 let view = new View({
     center: transform(center, 'EPSG:4326', 'EPSG:3857'),
     zoom: zoom
@@ -1152,12 +1151,11 @@ async function nmsPredictions(featuresInExtent, zoom) {
     return featureCollection
 }
 async function nmmWrapper(nmm_extent) {
-    const zoom = Math.round(view.getZoom());
     const featuresInExtent = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
-    const objectPredictions = convertFCstoOPs(featuresInExtent, zoom);
+    const objectPredictions = convertFCstoOPs(featuresInExtent, intZoom);
     const objectPredictions2 = nmm_postprocess.call(objectPredictions);
-    const featureCollection2 = convertOPstoFCs(objectPredictions2, zoom);
-    const featureCollection3 = await nmsPredictions(featureCollection2, zoom);
+    const featureCollection2 = convertOPstoFCs(objectPredictions2, intZoom);
+    const featureCollection3 = await nmsPredictions(featureCollection2, intZoom);
     activePredictionLayer.getSource().removeFeatures(featuresInExtent);
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
@@ -1206,7 +1204,7 @@ tfjs_worker.onmessage = function (event) {
 };
 
 function get_tiles_from_extent(box) {
-    let z = Math.round(view.getZoom())
+    let z = intZoom;
     let [x0, y0] = meter2tile2(box[0], box[1], z);
     let [x1, y1] = meter2tile2(box[2], box[3], z);
 
