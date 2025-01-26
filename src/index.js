@@ -801,7 +801,7 @@ featurelist.on('select', function(e) {
 });
 featurelist.on('dblclick', function(e) {
     map.getView().fit(e.feature.getGeometry().getExtent())
-    map.getView().setZoom(map.getView().getZoom() - 1)
+    map.getView().setZoom(Math.min(map.getView().getZoom(), 20) - 1)
 });
 const select = new Select({
     hitTolerance: 5,
