@@ -44,12 +44,6 @@ async function fetchImage(url) {
     const blob = await response.blob();
     return createImageBitmap(blob);
 }
-function getImageData(img) {
-    const canvas = new OffscreenCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    return ctx.getImageData(0, 0, img.width, img.height, { colorSpace: 'srgb' });
-}
 function getTileCombos(tiles) {
     const combos = [];
 
@@ -78,6 +72,16 @@ function getTileCombos(tiles) {
     });
     return combos;
 }
+
+async function preprocessTiles(tiles) {
+    const combos = getTileCombos(tiles);
+    let chunks = [];
+    for (let i = 0; i < combos.length; i += batch_size) {
+        const batch = combos.slice(i, i + batch_size);
+        chunks.push(batch);
+    }
+    return [combos, chunks];
+}
 async function constructImages(tiles) {
     const tileImages = await Promise.all(tiles.map(tile => fetchImage(tile.url)));
     const tileWidth = tileImages[0].width;
@@ -94,47 +98,37 @@ async function constructImages(tiles) {
     }
     return ctx.getImageData(0, 0, imgsz[0], imgsz[1], { colorSpace: 'srgb' });
 }
-
-async function processTile(tile, isCombo = false) {
-
-    // get image data of the combines tile or a single tile
-    let imageData;
-    if (isCombo) {
-        imageData = await constructImages(tile);
-    } else {
-        const img = await fetchImage(tile.url);
-        imageData = getImageData(img);
-    }
-    // run the detections type on the image data
-    let boxes, scores, classes;
-    if (task === "detect") {
-        [boxes, scores, classes] = await detect(imageData);
-    } else if (task === "obb") {
-        [boxes, scores, classes] = await detectOBB(imageData);
-    }
-    return convertDetections(boxes, scores, classes, tile);
-}
-
-function convertDetections(boxes, scores, classes, tile) {
-    const { x: x_tile, y: y_tile, z: zoom } = Array.isArray(tile) ? tile[0] : tile;
+function convertDetections(boxes, scores, classes) {
     const boxesArray = Array.from(boxes);
     const scoresArray = Array.from(scores);
     const classesArray = Array.from(classes);
 
     return classesArray.map((classIndex, i) => {
-        const box = boxesArray.slice(i * (task === "detect" ? 4 : 5), (i + 1) * (task === "detect" ? 4 : 5));
-        const corners = getCorners(box);
-        // console.log({ box: box, corners: corners, info: [x_center, y_center, width, height], class: classIndex });
-        const meters = corners.map(([x, y]) => imageCoord2Meters(x, y, x_tile, y_tile, zoom));
+        const corners = getCorners(boxesArray[i]);
         return {
-            corners: meters,
+            corners: corners,
             classIndex: classIndex,
             label: labels[classIndex],
             score: scoresArray[i],
         };
     });
 }
-
+function bounds2meters(bounds, tile) {
+    const { x: x_tile, y: y_tile, z: zoom } = Array.isArray(tile) ? tile[0] : tile;
+    const [mx0, my0] = imageCoord2Meters(bounds[0], bounds[1], x_tile, y_tile, zoom);
+    const [mx1, my1] = imageCoord2Meters(bounds[2], bounds[3], x_tile, y_tile, zoom);
+    return [mx0, my0, mx1, my1]
+}
+function convertBounds2Meters(boxes, combos) {
+    let meters = [];
+    boxes.map((bounds, i) => {
+        const tile = combos[i];
+        bounds.forEach((bound) => {
+            meters.push(bounds2meters(bound, tile));
+        })
+    });
+    return meters;
+}
 function getViewExtent(tiles) {
     const { x: x_tile0, y: y_tile0, z: _ } = Array.isArray(tiles) ? tiles[0] : tiles;
     const { x: x_tile1, y: y_tile1, z: zoom } = Array.isArray(tiles) ? tiles[tiles.length - 1] : tiles;
@@ -142,35 +136,38 @@ function getViewExtent(tiles) {
     const [mx1, my0] = imageCoord2Meters(0, 0, x_tile1 + 1, y_tile1 + 1, zoom);
     return [mx0, my0, mx1, my1];
 }
+async function processTiles(tiles) {
+    let t0 = performance.now();
+    const [combos, chunks] = await preprocessTiles(tiles);
+    console.log('preprocessTiles:', tiles.length, 'tiles', combos.length, 'images', chunks.length, 'batches', (performance.now() - t0) / 1000, 'seconds');
+    let boxes, scores, classes;
+    for (const chunk of chunks) {
+        t0 = performance.now();
+        let images = [];
+        for (const combo of chunk) {
+            const imageData = await constructImages(combo);
+            images.push(tf.browser.fromPixels(imageData).div(255.0));
+        }
+        if (task === "detect") {
+            [boxes, scores, classes] = await detect(images);
+        } else if (task === "obb") {
+            [boxes, scores, classes] = await detectOBB(images);
+        }
+        const meters = convertBounds2Meters(boxes, chunk);
+        const results = convertDetections(meters, scores.flat(), classes.flat());
+        self.postMessage({results: results});
+        console.log('batch completed in:', (performance.now() - t0) / 1000, 'seconds');
+    }
+}
 
 self.onmessage = async function (event) {
     if (event.data.tiles) {
         const t0 = performance.now();
         const tiles = Object.values(event.data.tiles);
         const viewExtent = getViewExtent(tiles);
-        if (imgsz[0] === 512 && imgsz[1] === 512) {
-            const combos = getTileCombos(tiles);
-            for (const combo of combos) {
-                try {
-                    const comboResults = await processTile(combo, true);
-                    self.postMessage({results: comboResults});
-                } catch (error) {
-                    console.log(error);
-                    self.postMessage({error: 'Error processing combo', combo});
-                }
-            }
-        }
-        if (imgsz[0] === 256 && imgsz[1] === 256) {
-            for (const tile of tiles) {
-                try {
-                    const tileResults = await processTile(tile);
-                    self.postMessage({results: tileResults});
-                } catch (error) {
-                    console.log(error);
-                    self.postMessage({error: 'Error processing tile', tile});
-                }
-            }
-        }
+        tf.engine().startScope();
+        await processTiles(tiles);
+        tf.engine().endScope();
         // postprocess all results (NMM, NMS, etc.)
         self.postMessage({ nmm_extent: viewExtent });
         console.log('Detection finished in :', (performance.now() - t0) / 1000, 'seconds');
@@ -211,12 +208,25 @@ const preprocess = (source) => {
     });
 };
 
-export const detect = async (source) => {
-    tf.engine().startScope();
-    const [input] = preprocess(source);
-    const res = model.predict(input);
 
-    const [boxes, scores, classes] = tf.tidy(() => {
+export const detect = async (images) => {
+    let boxes_data = [];
+    let scores_data = [];
+    let classes_data = [];
+    let res, boxes, scores, classes;
+
+    const batch = tf.stack(images);
+
+    if (batch.shape[0] === batch_size) {
+        res = model.predict(batch);
+    } else {
+        res = tf.tidy(() => {
+            let last_batch = tf.slice(tf.concat([batch, tf.zeros(model.inputs[0].shape)]), 0, batch_size)
+            let tempRes = model.predict(last_batch);
+            return tf.slice(tempRes, 0, batch.shape[0]);
+        });
+    }
+    [boxes, scores, classes] = tf.tidy(() => {
         const transRes = res.transpose([0, 2, 1]);
         const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
         const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
@@ -224,24 +234,64 @@ export const detect = async (source) => {
         const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2));
         const x2 = tf.add(x1, w);
         const y2 = tf.add(y1, h);
-        const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]).squeeze(0);
-        return [tf.concat([x1, y1, x2, y2], 2).squeeze(), rawScores.max(1), rawScores.argMax(1)];
+        const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]);
+        return [tf.concat([x1, y1, x2, y2], 2), rawScores.max(2), rawScores.argMax(2)];
     });
+    boxes_data.push(boxes);
+    scores_data.push(scores);
+    classes_data.push(classes);
+    res.dispose();
 
-    const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
-    const boxes_data = boxes.gather(nms).dataSync();
-    const scores_data = scores.gather(nms).dataSync();
-    const classes_data = classes.gather(nms).dataSync();
+    const boxes_tensor = tf.concat(boxes_data).unstack()
+    const scores_tensor = tf.concat(scores_data).unstack()
+    const classes_tensor = tf.concat(classes_data).unstack()
 
-    return [boxes_data, scores_data, classes_data];
+    let boxes_list = [];
+    let scores_list = [];
+    let classes_list = [];
+    let boxes_array, scores_array, classes_array;
+
+    for (let i = 0; i < scores_tensor.length; i++) {
+        const boxes = boxes_tensor[i];
+        const scores = scores_tensor[i];
+        const classes = classes_tensor[i];
+
+        const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
+
+        boxes_array = await boxes.gather(nms).array();
+        scores_array = await scores.gather(nms).array();
+        classes_array = await classes.gather(nms).array();
+
+        boxes_list.push(boxes_array);
+        scores_list.push(scores_array);
+        classes_list.push(classes_array);
+
+        boxes.dispose();
+        scores.dispose();
+        classes.dispose();
+        nms.dispose();
+    }
+    return [boxes_list, scores_list, classes_list];
 };
 
-export const detectOBB = async (source) => {
-    tf.engine().startScope();
-    const [input] = preprocess(source);
-    const res = model.predict(input);
+export const detectOBB = async (images) => {
+    let boxes_data = [];
+    let scores_data = [];
+    let classes_data = [];
+    let res, boxes, scores, classes;
 
-    const [boxes, scores, classes] = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
+    const batch = tf.stack(images);
+
+    if (batch.shape[0] === batch_size) {
+        res = model.predict(batch);
+    } else {
+        res = tf.tidy(() => {
+            let last_batch = tf.slice(tf.concat([batch, tf.zeros(model.inputs[0].shape)]), 0, batch_size)
+            let tempRes = model.predict(last_batch);
+            return tf.slice(tempRes, 0, batch.shape[0]);
+        });
+    }
+    [boxes, scores, classes] = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
         const transRes = res.transpose([0, 2, 1]);
         const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
         const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
@@ -250,17 +300,44 @@ export const detectOBB = async (source) => {
         const x2 = tf.add(x1, w); // x2
         const y2 = tf.add(y1, h); // y2
         const rotation = transRes.slice([0, 0, transRes.shape[2] - 1], [-1, -1, 1]); // rotation, between -π/2 to π/2 radians
-        const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
-        return [tf.concat([x1, y1, x2, y2, rotation], 2).squeeze(), rawScores.max(1), rawScores.argMax(1)];
+        const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]);
+        return [tf.concat([x1, y1, x2, y2, rotation], 2), rawScores.max(2), rawScores.argMax(2)];
     });
+    boxes_data.push(boxes);
+    scores_data.push(scores);
+    classes_data.push(classes);
+    res.dispose();
+
+    const boxes_tensor = tf.concat(boxes_data).unstack()
+    const scores_tensor = tf.concat(scores_data).unstack()
+    const classes_tensor = tf.concat(classes_data).unstack()
+
+    let boxes_list = [];
+    let scores_list = [];
+    let classes_list = [];
+    let boxes_array, scores_array, classes_array;
+
+    for (let i = 0; i < scores_tensor.length; i++) {
+        const boxes = boxes_tensor[i];
+        const scores = scores_tensor[i];
+        const classes = classes_tensor[i];
 
     // subselect the first 4 values of the box (x1, y1, x2, y2) for nms
-    const nmsBoxes = boxes.slice([0, 0], [-1, 4]);
-    const nms = await tf.image.nonMaxSuppressionAsync(nmsBoxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
-    const boxes_data = boxes.gather(nms, 0).dataSync();
-    const scores_data = scores.gather(nms, 0).dataSync();
-    const classes_data = classes.gather(nms, 0).dataSync();
+        const nmsBoxes = boxes.slice([0, 0], [-1, 4]);
+        const nms = await tf.image.nonMaxSuppressionAsync(nmsBoxes, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
+        boxes_array = await boxes.gather(nms).array();
+        scores_array = await scores.gather(nms).array();
+        classes_array = await classes.gather(nms).array();
 
-    return [boxes_data, scores_data, classes_data];
+        boxes_list.push(boxes_array);
+        scores_list.push(scores_array);
+        classes_list.push(classes_array);
+
+        boxes.dispose();
+        scores.dispose();
+        classes.dispose();
+        nms.dispose();
+    }
+    return [boxes_list, scores_list, classes_list];
 };
 
