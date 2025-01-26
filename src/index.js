@@ -287,7 +287,6 @@ function ThunderForestSource(layer) {
         attributions: thunderforestAttributions
     });
 }
-
 function GoogleSource(layer) {
     return new ImageTileSource({
         url: 'https://mt{0-3}.google.com/vt/lyrs=' + layer + '&x={x}&y={y}&z={z}',
@@ -300,7 +299,6 @@ function GoogleSource(layer) {
         // },
     });
 }
-
 function BingSource(layer) {
     return new BingMaps({
         key: process.env.BINGMAPS_API_KEY,
@@ -315,7 +313,6 @@ function MapboxSource(tileSize) {
     });
 }
 
-
 let sourceOSM = new OSM();
 let sourceTFOutdoors = new ThunderForestSource('outdoors');
 let sourceTFLandscape = new ThunderForestSource('landscape');
@@ -324,19 +321,26 @@ let sourceTFTransportDark = new ThunderForestSource('transport-dark');
 let sourceTFCycle = new ThunderForestSource('cycle');
 
 let sourceGoogleSatellite = new GoogleSource('s');
-sourceGoogleSatellite.tileToURL = {}
 let sourceGoogleRoads = new GoogleSource('r');
 let sourceGoogleLabels = new GoogleSource('h');
 
 let sourceBingAerial = new BingSource('Aerial');
 let sourceBingRoads = new BingSource('Road');
 
-let sourceMapbox = new MapboxSource(512)
+let sourceMapbox = new MapboxSource()
 
+sourceGoogleSatellite.tileToURL = {}
+sourceBingAerial.tileToURL = {}
+sourceMapbox.tileToURL = {}
 function handleTileLoad(event) {
     this.tileToURL[event.tile.tileCoord] = event.tile.getData().src;
 }
+function handleTileLoadBing(event) {
+    this.tileToURL[event.tile.tileCoord] = event.tile.getImage().src;
+}
 sourceGoogleSatellite.on('tileloadend', handleTileLoad);
+sourceBingAerial.on('tileloadend', handleTileLoadBing);
+sourceMapbox.on('tileloadend', handleTileLoad);
 
 let activePredictionLayer;
 
@@ -585,7 +589,6 @@ let map = new Map({
     interactions: defaultInteractions(), //.extend([dragAndDropInteraction]),
     maxTilesLoading: 24
 });
-
 
 let $LeftLayerLabelDiv = document.createElement('div')
 $LeftLayerLabelDiv.id = 'LeftLayerLabel'
