@@ -99,12 +99,6 @@ async function combineImages(tiles) {
     return ctx.getImageData(0, 0, 2 * tileWidth, 2 * tileHeight, { colorSpace: 'srgb' });
 }
 
-async function debugTile(tile) {
-    const img = await fetchImage(tile.url);
-    const imageData = getImageData(img);
-    const [boxes, scores, classes] = await detect(imageData, model);
-    return convertDetections(boxes, scores, classes, tile);
-}
 async function processTile(tile, isCombo = false) {
 
     // get image data of the combines tile or a single tile
@@ -185,7 +179,6 @@ self.onmessage = async function (event) {
         self.postMessage({ nmm_extent: viewExtent });
         console.log('Detection finished in :', (performance.now() - t0) / 1000, 'seconds');
     }
-
     if (event.data.model) {
         self.postMessage({ ready: false });
         await loadModel(event.data.model);
@@ -199,12 +192,6 @@ self.onmessage = async function (event) {
         } else {
             base_dir = url
         }
-    }
-    if (event.data.debugTile) { // debug tile
-        const tile = event.data.debugTile;
-        const debugResults = await debugTile(tile);
-        self.postMessage({ results: debugResults });
-        self.postMessage({ nms: true }); // run the nms on the debug results
     }
 };
 
