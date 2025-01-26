@@ -709,7 +709,7 @@ let layerswitcherleft = new LayerSwitcher({
 map.addControl(layerswitcherleft);
 
 let layerswitcheright = new LayerSwitcher({
-    trash: true,
+    trash: false,
     extent: true,
     collapsed: true,
     reordering: false,
@@ -766,6 +766,20 @@ map.on('moveend', function(e) {
 map.on('rendercomplete', function (e) {
     const res = map.getView().getResolution();
     intZoom = swipe.leftBaseLayer.getSource().getTileGrid().getZForResolution(res);
+
+    const titles = {};
+    for (const l of map.getAllLayers()) {
+        if (l.get('predLayer') || l.get('dragdropLayer')) {
+            titles[l.get('title')] = (titles[l.get('title')] || 0) + 1;
+        }
+    }
+    for (const l of map.getAllLayers()) {
+        if (l.get('predLayer') || l.get('dragdropLayer')) {
+            if (titles[l.get('title')] === 1) {
+                rightgroup.getLayers().getArray()[1].getLayers().remove(l);
+            }
+        }
+    }
 });
 // An overlay that stay on top
 let debugLayer = new TileLayer({
@@ -851,6 +865,7 @@ dragAndDropInteraction.on('addfeatures', function (e) {
             title: e.file.name,
             visible: true,
             baseLayer: false,
+            dragdropLayer: true,
             displayInLayerSwitcher: true,
             source: vectorSource,
             style: style
