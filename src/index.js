@@ -1110,15 +1110,15 @@ async function nmsDetections(featuresInExtent, zoom) {
 
     return featureCollection
 }
-async function nmmWrapper(vectorSource, nmm_extent) {
+async function nmmWrapper(nmm_extent) {
     const zoom = Math.round(view.getZoom());
-    const featuresInExtent = vectorSource.getFeaturesInExtent(nmm_extent);
+    const featuresInExtent = detectionSource.getFeaturesInExtent(nmm_extent);
     const objectPredictions = convertFCstoOPs(featuresInExtent, zoom);
     const objectPredictions2 = nmm_postprocess.call(objectPredictions);
     const featureCollection2 = convertOPstoFCs(objectPredictions2, zoom);
     const featureCollection3 = await nmsDetections(featureCollection2, zoom);
-    vectorSource.removeFeatures(featuresInExtent);
-    vectorSource.addFeatures(featureCollection3);
+    detectionSource.removeFeatures(featuresInExtent);
+    detectionSource.addFeatures(featureCollection3);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -1157,7 +1157,7 @@ tfjs_worker.onmessage = function (event) {
         });
     }
     // run nmm (and nms) on all detections
-    if (nmm_extent) { nmmWrapper(detectionSource, nmm_extent) }
+    if (nmm_extent) { nmmWrapper(nmm_extent) }
     // Handle the labels if the model is ready
     if (labels) { updateLabels(labels) }
 
