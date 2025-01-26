@@ -13,24 +13,31 @@ const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
 async function loadModel(model_name) {
-    // load model
-    const model_url = `${base_dir}/models/${model_name}/model.json`;
-    model = await tf.loadGraphModel(model_url);
-    const dummyInput = tf.ones(model.inputs[0].shape);
-    const warmupResults = model.predict(dummyInput);
-    tf.dispose([warmupResults, dummyInput]);
     // load model metadata
+    let t0 = performance.now();
     const metadata_url = `${base_dir}/models/${model_name}/metadata.yaml`;
     const response = await fetch(metadata_url);
     const text = await response.text();
     const metadata = yaml.load(text);
+    task = metadata.task;
+    imgsz = metadata.imgsz;
     labels = metadata.names;
     num_classes = Object.entries(labels).length;
     batch_size = metadata.batch;
-    imgsz = metadata.imgsz;
-    task = metadata.task;
-    console.log(`${model_name} model loaded with ${num_classes} classes and ${batch_size} batch size`);
     self.postMessage({ labels: labels });
+    console.log(`task: ${task}, imgsz: ${imgsz}, num_classes: ${num_classes}`)
+    console.log(`batch_size: ${batch_size}, half: ${metadata.args.half}, int8: ${metadata.args.int8}`);
+    console.log(`model metadata loaded in ${(performance.now() - t0) / 1000} seconds`);
+    // load model
+    t0 = performance.now();
+    console.log(`model loading ${model_name}`);
+    const model_url = `${base_dir}/models/${model_name}/model.json`;
+    model = await tf.loadGraphModel(model_url);
+    const dummyInput = tf.ones(model.inputs[0].shape);
+    const warmupResults = model.predict(dummyInput);
+    dummyInput.dispose();
+    warmupResults.dispose();
+    console.log(`model loaded in ${(performance.now() - t0) / 1000} seconds`);
 }
 async function fetchImage(url) {
     const response = await fetch(url);
@@ -176,8 +183,7 @@ self.onmessage = async function (event) {
         }
         // postprocess all results (NMM, NMS, etc.)
         self.postMessage({ nmm_extent: viewExtent });
-        const t1 = performance.now();
-        console.log('Detection finished in :', (t1 - t0) / 1000, 'seconds');
+        console.log('Detection finished in :', (performance.now() - t0) / 1000, 'seconds');
     }
 
     if (event.data.model) {

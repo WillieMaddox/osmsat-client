@@ -129,7 +129,7 @@ let labels = [];
 let colors = [];
 function updateLabels(newLabels) {
     labels = newLabels;
-    colors = Array.from({ length: Object.entries(labels).length }, () => randomColor(0.1));
+    colors = Array.from({ length: Object.entries(labels).length }, () => randomColor(0.2));
 }
 // Function to create text style with hardcoded settings
 const createTextStyle = function (feature, resolution) {
@@ -206,7 +206,7 @@ const formatArea = function (polygon) {
     return output;
 };
 
-let zoom = 16, center = [-110.83, 32.155];
+let zoom = 19, center = [-110.8605, 32.1666];
 
 let thunderforestAttributions = [
     'Tiles &copy; <a href="https://www.thunderforest.com/">Thunderforest</a>',
@@ -506,6 +506,7 @@ function StaticGroup() {
                         title: 'Google (Labels)',
                         visible: false,
                         baseLayer: false,
+                        noSwitcherDelete: true,
                         source: sourceGoogleLabels,
                     }),
                 ]
@@ -516,7 +517,6 @@ function StaticGroup() {
 
 let leftgroup = new StaticGroup();
 let rightgroup = new StaticGroup();
-
 // Controls
 // TODO: Wrap the mouse positions in a status control toggle
 let controls = [
@@ -609,8 +609,8 @@ function switchleft(layer) {
     if (layer.get('baseLayer')) {
         swipe.layers.forEach( function(l) {
             if (!l.right && l.layer.get('baseLayer')) {
-                add_layers.push(layer);
                 del_layers.push(l.layer);
+                add_layers.push(layer);
             }
         })
     } else {
@@ -681,7 +681,7 @@ function initswipelayer({ layergroup, right, idx = 0 } = {}) {
     let layers = layergroup.getLayers().getArray()[0].getLayersArray()
     let index = mod(layers.length - (1 + idx), layers.length)
     let layer = layers[index]
-    layer.setVisible(true)
+    layer.setVisible(true);
     swipe.addLayer(layer, right);
     if (right) {
         $RightLayerLabelDiv.innerHTML = layer.get('title') + " &#9658;";
@@ -691,12 +691,12 @@ function initswipelayer({ layergroup, right, idx = 0 } = {}) {
     }
     // console.log(layer.get('title') + (right?" right":" left"));
 }
-initswipelayer({ layergroup: leftgroup, right: false, idx: -1 })
 initswipelayer({ layergroup: rightgroup, right: true, idx: 0 })
+initswipelayer({ layergroup: leftgroup, right: false, idx: -1 })
 map.addControl(swipe);
 
 // Main control bar
-var mainbar = new Bar();
+let mainbar = new Bar();
 map.addControl(mainbar);
 
 // Add a button to get predictions from the active baselayer.
@@ -721,7 +721,7 @@ map.on('moveend', function(e) {
 let debugLayer = new TileLayer({
     title: "Debug Tiles",
     visible: false,
-    displayInLayerSwitcher: false,
+    // displayInLayerSwitcher: false,
     source: new TileDebug(),
 });
 map.addLayer(debugLayer);
@@ -787,12 +787,13 @@ dragAndDropInteraction.on('addfeatures', function (e) {
     const vectorSource = new VectorSource({
         features: e.features,
     });
+    const color = randomColor()
     const style = new Style({
         image: new CircleStyle({
             radius: 3,
-            stroke: new Stroke({ color: randomColor(), width: 2 }),
+            stroke: new Stroke({ color: color, width: 2 }),
         }),
-        stroke: new Stroke({ color: randomColor(), width: 3 }),
+        stroke: new Stroke({ color: color, width: 3 }),
         // stroke: new Stroke({color: 'rgb(255,165,0)', width: 3}),
     })
     function DragAndDropVectorLayer() {
@@ -806,12 +807,12 @@ dragAndDropInteraction.on('addfeatures', function (e) {
         })
     }
 
-    let leftVectorLayer = new DragAndDropVectorLayer()
-    let rightVectorLayer = new DragAndDropVectorLayer()
+    let leftVectorLayer = new DragAndDropVectorLayer();
+    let rightVectorLayer = new DragAndDropVectorLayer();
     leftgroup.getLayers().getArray()[1].getLayers().push(leftVectorLayer);
     rightgroup.getLayers().getArray()[1].getLayers().push(rightVectorLayer);
-    swipe.addLayer(leftVectorLayer, false)
-    swipe.addLayer(rightVectorLayer, true)
+    swipe.addLayer(leftVectorLayer, false);
+    swipe.addLayer(rightVectorLayer, true);
     map.getView().fit(vectorSource.getExtent());
 });
 
@@ -870,11 +871,11 @@ mainbar.addControl(nestedbar);
 // Add a toggle for drawing bounding boxes
 let bboxLayer = new VectorLayer({
     name: 'BBox',
+    visible: false,
     source: new VectorSource(),
     style: new Style({
         stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
     }),
-    visible: false
 });
 map.addLayer(bboxLayer);
 let bboxToggle = new Toggle({
@@ -1052,7 +1053,7 @@ rightgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 leftgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
 
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
-async function nmsDetections(featuresInExtent, zoom) {
+async function nmsPredictions(featuresInExtent, zoom) {
     // create boxes, scores, and classes from feature values
     let boxes = [];
     let scores = [];
@@ -1116,7 +1117,7 @@ async function nmmWrapper(nmm_extent) {
     const objectPredictions = convertFCstoOPs(featuresInExtent, zoom);
     const objectPredictions2 = nmm_postprocess.call(objectPredictions);
     const featureCollection2 = convertOPstoFCs(objectPredictions2, zoom);
-    const featureCollection3 = await nmsDetections(featureCollection2, zoom);
+    const featureCollection3 = await nmsPredictions(featureCollection2, zoom);
     detectionSource.removeFeatures(featuresInExtent);
     detectionSource.addFeatures(featureCollection3);
 }
