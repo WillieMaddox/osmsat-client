@@ -78,19 +78,21 @@ function getTileCombos(tiles) {
     });
     return combos;
 }
-async function combineImages(tiles) {
+async function constructImages(tiles) {
     const tileImages = await Promise.all(tiles.map(tile => fetchImage(tile.url)));
     const tileWidth = tileImages[0].width;
     const tileHeight = tileImages[0].height;
-    const canvas = new OffscreenCanvas(2 * tileWidth, 2 * tileHeight);
+    const nx = imgsz[0] / tileWidth;
+    const ny = imgsz[1] / tileHeight;
+    const canvas = new OffscreenCanvas(imgsz[0], imgsz[1]);
     const ctx = canvas.getContext('2d');
 
-    ctx.drawImage(tileImages[0], 0, 0);
-    ctx.drawImage(tileImages[1], tileWidth, 0);
-    ctx.drawImage(tileImages[2], 0, tileHeight);
-    ctx.drawImage(tileImages[3], tileWidth, tileHeight);
-
-    return ctx.getImageData(0, 0, 2 * tileWidth, 2 * tileHeight, { colorSpace: 'srgb' });
+    for (let j = 0; j < ny; j++) {
+        for (let i = 0; i < nx; i++) {
+            ctx.drawImage(tileImages[j * nx + i], tileWidth * i, tileHeight * j);
+        }
+    }
+    return ctx.getImageData(0, 0, imgsz[0], imgsz[1], { colorSpace: 'srgb' });
 }
 
 async function processTile(tile, isCombo = false) {
@@ -98,7 +100,7 @@ async function processTile(tile, isCombo = false) {
     // get image data of the combines tile or a single tile
     let imageData;
     if (isCombo) {
-        imageData = await combineImages(tile);
+        imageData = await constructImages(tile);
     } else {
         const img = await fetchImage(tile.url);
         imageData = getImageData(img);
@@ -261,3 +263,4 @@ export const detectOBB = async (source) => {
 
     return [boxes_data, scores_data, classes_data];
 };
+
