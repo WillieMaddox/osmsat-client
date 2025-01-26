@@ -338,6 +338,7 @@ function handleTileLoad(event) {
 }
 sourceGoogleSatellite.on('tileloadend', handleTileLoad);
 
+let activePredictionLayer;
 
 // TODO: Add Attribution for left hand layer.
 function StaticGroup() {
@@ -419,6 +420,7 @@ function StaticGroup() {
                         title: 'Mapbox',
                         // title: 'Mapbox (512)',
                         visible: false,
+                        satLayer: true,
                         baseLayer: true,
                         noSwitcherDelete: true,
                         source: sourceMapbox,
@@ -426,6 +428,7 @@ function StaticGroup() {
                     new TileLayer({
                         title: 'Google',
                         visible: false,
+                        satLayer: true,
                         baseLayer: true,
                         noSwitcherDelete: true,
                         source: sourceGoogleSatellite,
@@ -433,6 +436,7 @@ function StaticGroup() {
                     new TileLayer({
                         title: 'Bing',
                         visible: false,
+                        satLayer: true,
                         baseLayer: true,
                         noSwitcherDelete: true,
                         source: sourceBingAerial,
@@ -603,6 +607,37 @@ document.getElementsByClassName('ol-viewport')[0].appendChild($RightLayerLabelDi
 
 let swipe = new Swipe()
 
+function NewPredictionLayer(predLayerName, predSource) {
+    return new VectorLayer({
+        title: `${predLayerName} (Detections)`,
+        visible: true,
+        baseLayer: false,
+        predLayer: predLayerName,
+        source: predSource,
+        style: polygonStyleFunction
+    })
+}
+function addNewPredictionLayer(predLayer) {
+    let predSource = new VectorSource()
+    let leftVectorLayer = new NewPredictionLayer(predLayer, predSource)
+    let rightVectorLayer = new NewPredictionLayer(predLayer, predSource)
+    leftgroup.getLayers().getArray()[1].getLayers().push(leftVectorLayer);
+    rightgroup.getLayers().getArray()[1].getLayers().push(rightVectorLayer);
+    swipe.addLayer(leftVectorLayer, false);
+    let predLayerFound = false;
+    swipe.layers.forEach(l => {
+        if (l.right && l.layer.get('baseLayer') && l.layer.get('title') === predLayer) {
+            predLayerFound = true;
+        }
+    })
+    if (predLayerFound) {
+        swipe.addLayer(rightVectorLayer, true)
+    } else {
+        rightVectorLayer.setVisible(false)
+    }
+    return leftVectorLayer;
+}
+
 function switchleft(layer) {
     let add_layers = [];
     let del_layers = [];
@@ -613,6 +648,19 @@ function switchleft(layer) {
                 add_layers.push(layer);
             }
         })
+        if (layer.get('satLayer')) {
+            let predLayerFound = false;
+            this._layers.forEach( function(l) {
+                if (l.layer.get('predLayer') === layer.get('title')) {
+                    add_layers.push(l.layer);
+                    activePredictionLayer = l.layer;
+                    predLayerFound = true;
+                }
+            })
+            if (!predLayerFound) {
+                activePredictionLayer = addNewPredictionLayer(layer.get('title'));
+            }
+        }
     } else {
         if (layer.get('visible')) {
             add_layers.push(layer);
@@ -621,7 +669,10 @@ function switchleft(layer) {
         }
     }
     swipe.removeLayer(del_layers);
-    swipe.addLayer(add_layers, false);
+    add_layers.forEach( function(l) {
+        l.setVisible(true);
+        swipe.addLayer(l, false);
+    })
     if (layer.get('baseLayer')) {
         swipe.leftBaseLayer = layer;
         $LeftLayerLabelDiv.innerHTML = "&#9668; " + layer.get('title')
@@ -683,6 +734,9 @@ function initswipelayer({ layergroup, right, idx = 0 } = {}) {
     let layer = layers[index]
     layer.setVisible(true);
     swipe.addLayer(layer, right);
+    if (!right && layer.get('satLayer')) {
+        activePredictionLayer = addNewPredictionLayer(layer.get('title'));
+    }
     if (right) {
         $RightLayerLabelDiv.innerHTML = layer.get('title') + " &#9658;";
     } else {
@@ -1038,20 +1092,6 @@ showSegments.onchange = function () {
     measureDraw.getOverlay().changed();
 };
 
-// make a vector layer for detections
-const detectionSource = new VectorSource();
-const detectionLayer = new VectorLayer({
-    source: detectionSource,
-    title: "Detections",
-    visible: true,
-    baseLayer: false,
-    displayInLayerSwitcher: true,
-    style: polygonStyleFunction
-});
-map.addLayer(detectionLayer);
-rightgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
-leftgroup.getLayers().getArray()[1].getLayers().push(detectionLayer);
-
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
 async function nmsPredictions(featuresInExtent, zoom) {
     // create boxes, scores, and classes from feature values
@@ -1113,13 +1153,13 @@ async function nmsPredictions(featuresInExtent, zoom) {
 }
 async function nmmWrapper(nmm_extent) {
     const zoom = Math.round(view.getZoom());
-    const featuresInExtent = detectionSource.getFeaturesInExtent(nmm_extent);
+    const featuresInExtent = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
     const objectPredictions = convertFCstoOPs(featuresInExtent, zoom);
     const objectPredictions2 = nmm_postprocess.call(objectPredictions);
     const featureCollection2 = convertOPstoFCs(objectPredictions2, zoom);
     const featureCollection3 = await nmsPredictions(featureCollection2, zoom);
-    detectionSource.removeFeatures(featuresInExtent);
-    detectionSource.addFeatures(featureCollection3);
+    activePredictionLayer.getSource().removeFeatures(featuresInExtent);
+    activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -1154,10 +1194,10 @@ tfjs_worker.onmessage = function (event) {
                 label: result.label,
                 score: result.score
             });
-            detectionSource.addFeature(boxFeature);
+            activePredictionLayer.getSource().addFeature(boxFeature);
         });
     }
-    // run nmm (and nms) on all detections
+    // run nmm (and nms) on all predictions
     if (nmm_extent) { nmmWrapper(nmm_extent) }
     // Handle the labels if the model is ready
     if (labels) { updateLabels(labels) }
