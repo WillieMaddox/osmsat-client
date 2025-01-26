@@ -324,6 +324,7 @@ let sourceTFTransportDark = new ThunderForestSource('transport-dark');
 let sourceTFCycle = new ThunderForestSource('cycle');
 
 let sourceGoogleSatellite = new GoogleSource('s');
+sourceGoogleSatellite.tileToURL = {}
 let sourceGoogleRoads = new GoogleSource('r');
 let sourceGoogleLabels = new GoogleSource('h');
 
@@ -332,9 +333,8 @@ let sourceBingRoads = new BingSource('Road');
 
 let sourceMapbox = new MapboxSource()
 
-const google_tile_to_url = {};
 function handleTileLoad(event) {
-    google_tile_to_url[event.tile.tileCoord] = event.tile.getData().src;
+    this.tileToURL[event.tile.tileCoord] = event.tile.getData().src;
 }
 sourceGoogleSatellite.on('tileloadend', handleTileLoad);
 
@@ -623,6 +623,7 @@ function switchleft(layer) {
     swipe.removeLayer(del_layers);
     swipe.addLayer(add_layers, false);
     if (layer.get('baseLayer')) {
+        swipe.leftBaseLayer = layer;
         $LeftLayerLabelDiv.innerHTML = "&#9668; " + layer.get('title')
     }
     // console.log(' left ' + layer.get('title') + ' ' + layer.get('baseLayer') + ' ' + layer.get('visible'));
@@ -685,6 +686,7 @@ function initswipelayer({ layergroup, right, idx = 0 } = {}) {
     if (right) {
         $RightLayerLabelDiv.innerHTML = layer.get('title') + " &#9658;";
     } else {
+        swipe.leftBaseLayer = layer;
         $LeftLayerLabelDiv.innerHTML = "&#9668; " + layer.get('title');
     }
     // console.log(layer.get('title') + (right?" right":" left"));
@@ -1171,7 +1173,7 @@ function get_tiles_from_extent(box) {
     let tiles = [];
     for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
         for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
-            const url = google_tile_to_url[[z, x, y].join(',')];
+            const url = swipe.leftBaseLayer.getSource().tileToURL[[z, x, y].join(',')];
             tiles.push({ x, y, z, url });
         }
     }
