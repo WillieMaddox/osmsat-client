@@ -50,7 +50,7 @@ function getImageData(img) {
     ctx.drawImage(img, 0, 0);
     return ctx.getImageData(0, 0, img.width, img.height, { colorSpace: 'srgb' });
 }
-function checkAdjacentTiles(tiles, duplicates = true) {
+function getTileCombos(tiles) {
     const combos = [];
 
     const urlmap = tiles.reduce((acc, obj) => {
@@ -61,25 +61,19 @@ function checkAdjacentTiles(tiles, duplicates = true) {
     }, {});
 
     const tileSet = new Set(tiles.map(({ x, y, z }) => `${x},${y},${z}`));
+    const nx = imgsz[0] / 256
+    const ny = imgsz[1] / 256
     tiles.forEach(({ x, y, z }) => {
-        if (
-            tileSet.has(`${x},${y},${z}`) &&
-            tileSet.has(`${x + 1},${y},${z}`) &&
-            tileSet.has(`${x},${y + 1},${z}`) &&
-            tileSet.has(`${x + 1},${y + 1},${z}`)
-        ) {
-            combos.push([
-                { x, y, z, url: urlmap[`${x},${y},${z}`] },
-                { x: x + 1, y, z, url: urlmap[`${x + 1},${y},${z}`] },
-                { x, y: y + 1, z, url: urlmap[`${x},${y + 1},${z}`] },
-                { x: x + 1, y: y + 1, z, url: urlmap[`${x + 1},${y + 1},${z}`] }
-            ]);
-            if (!duplicates) {
-                tileSet.delete(`${x},${y},${z}`);
-                tileSet.delete(`${x + 1},${y},${z}`);
-                tileSet.delete(`${x},${y + 1},${z}`);
-                tileSet.delete(`${x + 1},${y + 1},${z}`);
+        const combo = []
+        for (let j = 0; j < ny; j++) {
+            for (let i = 0; i < nx; i++) {
+                if (tileSet.has(`${x + i},${y + j},${z}`)) {
+                    combo.push({ x: x + i, y: y + j, z, url: urlmap[`${x + i},${y + j},${z}`] });
+                }
             }
+        }
+        if (combo.length === nx * ny) {
+            combos.push(combo)
         }
     });
     return combos;
@@ -153,7 +147,7 @@ self.onmessage = async function (event) {
         const tiles = Object.values(event.data.tiles);
         const viewExtent = getViewExtent(tiles);
         if (imgsz[0] === 512 && imgsz[1] === 512) {
-            const combos = checkAdjacentTiles(tiles);
+            const combos = getTileCombos(tiles);
             for (const combo of combos) {
                 try {
                     const comboResults = await processTile(combo, true);
