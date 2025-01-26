@@ -188,27 +188,6 @@ self.onmessage = async function (event) {
     }
 };
 
-const preprocess = (source) => {
-    return tf.tidy(() => {
-        const img = tf.browser.fromPixels(source);
-        const [h, w] = img.shape.slice(0, 2);
-        const maxSize = Math.max(w, h);
-        const imgPadded = img.pad([
-            [0, maxSize - h],
-            [0, maxSize - w],
-            [0, 0]
-        ]);
-
-        return [
-            tf.image
-                .resizeBilinear(imgPadded, [imgsz[0], imgsz[1]])
-                .div(255.0)
-                .expandDims(0)
-        ];
-    });
-};
-
-
 export const detect = async (images) => {
     let boxes_data = [];
     let scores_data = [];

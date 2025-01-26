@@ -279,7 +279,6 @@ let thunderforestAttributions = [
 //     ]
 // });
 
-
 function ThunderForestSource(layer) {
     return new OSM({
         url: 'https://{a-c}.tile.thunderforest.com/' + layer + '/{z}/{x}/{y}.png' +
@@ -319,14 +318,11 @@ let sourceTFLandscape = new ThunderForestSource('landscape');
 let sourceTFTransport = new ThunderForestSource('transport');
 let sourceTFTransportDark = new ThunderForestSource('transport-dark');
 let sourceTFCycle = new ThunderForestSource('cycle');
-
 let sourceGoogleSatellite = new GoogleSource('s');
 let sourceGoogleRoads = new GoogleSource('r');
 let sourceGoogleLabels = new GoogleSource('h');
-
 let sourceBingAerial = new BingSource('Aerial');
 let sourceBingRoads = new BingSource('Road');
-
 let sourceMapbox = new MapboxSource()
 
 sourceGoogleSatellite.tileToURL = {}
@@ -723,7 +719,6 @@ let layerswitcheright = new LayerSwitcher({
 map.addControl(layerswitcheright);
 
 function initswipelayer({ layergroup, right, idx = 0 } = {}) {
-    // let layers = layergroup.getLayers().getArray()
     let layers = layergroup.getLayers().getArray()[0].getLayersArray()
     let index = mod(layers.length - (1 + idx), layers.length)
     let layer = layers[index]
@@ -738,7 +733,6 @@ function initswipelayer({ layergroup, right, idx = 0 } = {}) {
         swipe.leftBaseLayer = layer;
         $LeftLayerLabelDiv.innerHTML = "&#9668; " + layer.get('title');
     }
-    // console.log(layer.get('title') + (right?" right":" left"));
 }
 initswipelayer({ layergroup: rightgroup, right: true, idx: 0 })
 initswipelayer({ layergroup: leftgroup, right: false, idx: -1 })
@@ -765,7 +759,6 @@ let predictionWindow;
 map.on('moveend', function(e) {
     predictionWindow = e.frameState.extent;
 });
-
 map.on('rendercomplete', function (e) {
     const res = map.getView().getResolution();
     intZoom = swipe.leftBaseLayer.getSource().getTileGrid().getZForResolution(res);
@@ -850,7 +843,6 @@ const dragAndDropInteraction = new DragAndDrop({
 });
 map.addInteraction(dragAndDropInteraction);
 dragAndDropInteraction.on('addfeatures', function (e) {
-    // const randomcolor = randomColor()
     const vectorSource = new VectorSource({
         features: e.features,
     });
@@ -1222,7 +1214,6 @@ function get_tiles_from_extent(box) {
     let z = intZoom;
     let [x0, y0] = meter2tile2(box[0], box[1], z);
     let [x1, y1] = meter2tile2(box[2], box[3], z);
-
     // Collect all tiles within the view extent
     let tiles = [];
     for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
@@ -1233,7 +1224,6 @@ function get_tiles_from_extent(box) {
     }
     return tiles;
 }
-
 function runModelOnTiles() {
     const tiles = get_tiles_from_extent(predictionWindow);
     tfjs_worker.postMessage({ tiles: tiles });
