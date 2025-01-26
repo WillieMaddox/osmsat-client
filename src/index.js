@@ -307,10 +307,10 @@ function BingSource(layer) {
         imagerySet: layer
     });
 }
-
-function MapboxSource() {
+function MapboxSource(tileSize) {
     return new ImageTileSource({
-        url: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90' +
+        url: 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}' +
+            (tileSize===512?"@2x.jpg90":".jpg") +
             '?access_token=' + process.env.MAPBOX_API_KEY,
     });
 }
@@ -331,7 +331,7 @@ let sourceGoogleLabels = new GoogleSource('h');
 let sourceBingAerial = new BingSource('Aerial');
 let sourceBingRoads = new BingSource('Road');
 
-let sourceMapbox = new MapboxSource()
+let sourceMapbox = new MapboxSource(512)
 
 function handleTileLoad(event) {
     this.tileToURL[event.tile.tileCoord] = event.tile.getData().src;
