@@ -1168,7 +1168,7 @@ async function nmmWrapper(nmm_extent) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    tfjs_worker.postMessage({ model: "AllPlanes_512_08_19_411_half_web_model" });
+    tfjs_worker.postMessage({ model: "tfjs_web_model_path" });
     document.body.classList.add('hideOpacity')
 }, { passive: true });
 
