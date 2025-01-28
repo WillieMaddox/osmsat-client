@@ -1168,7 +1168,7 @@ async function nmmWrapper(nmm_extent) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    tfjs_worker.postMessage({ model: "tfjs_web_model_path" });
+    tfjs_worker.postMessage({ model: "AllPlanes_512_08_19_411_half_web_model" });
     document.body.classList.add('hideOpacity')
 }, { passive: true });
 
@@ -1228,3 +1228,41 @@ function runModelOnTiles() {
     const tiles = get_tiles_from_extent(predictionWindow);
     tfjs_worker.postMessage({ tiles: tiles });
 }
+
+
+// remove all overlays
+function toggleUI() {
+    const controls = document.getElementsByClassName('ol-control');
+    for (let i = 0; i < controls.length; i++) {
+        controls[i].style.display = controls[i].style.display === 'none' ? '' : 'none';
+    }
+    document.getElementsByClassName('ol-overlaycontainer')[0].style.display = document.getElementsByClassName('ol-overlaycontainer')[0].style.display === 'none' ? '' : 'none';
+    document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display = document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display === 'none' ? '' : 'none';
+    document.getElementById('panel').style.display = document.getElementById('panel').style.display === 'none' ? '' : 'none';
+    document.getElementById('map').style.bottom = document.getElementById('map').style.bottom === '0px' ? '50px' : '0px';
+}
+
+// create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
+document.addEventListener('keydown', function (event) {
+    const debugElement = document.querySelectorAll('button[type=button][title="Tiling Grid"]')[0];
+    const predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
+    const measureElement = document.querySelectorAll('button[type=button][title="Measure"]')[0];
+    const bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
+
+    // if the search bar is not "ol-collapsed", then we must be using it so dont do shortcuts
+    if (document.getElementsByClassName('nominatim ol-search ol-unselectable ol-control ol-collapsed').length != 1) {
+        return;
+    }
+
+    if (event.key === 'd') {
+        debugElement.click();
+    } else if (event.key === 'p') {
+        predictElement.click();
+    } else if (event.key === 'm') {
+        measureElement.click();
+    } else if (event.key === 'b') {
+        bboxElement.click();
+    } else if (event.key === 'h') { // hide everything but the map
+        toggleUI()
+    }
+}, { passive: true });
