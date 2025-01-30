@@ -1,0 +1,18 @@
+description: Ultralytics YOLO11s model trained on /mnt/M22TB/DATA/peopletec/datasets/CivPlanes/smart_slice_512_0/class_1/yolo/data.yaml
+author: Ultralytics
+date: '2025-01-28T10:22:33.974711'
+version: 8.3.61
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 8
+imgsz:
+- 512
+- 512
+names:
+  0: airplane
+args:
+  batch: 8
+  half: true
+  int8: false

@@ -1176,7 +1176,7 @@ async function nmmWrapper(nmm_extent) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    tfjs_worker.postMessage({ model: "tfjs_web_model_path" });
+    tfjs_worker.postMessage({ model: "CivPlanes_detect_1_160k_08_half_web_model" });
     document.body.classList.add('hideOpacity')
 }, { passive: true });
 
