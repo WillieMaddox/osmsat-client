@@ -45,8 +45,8 @@ import FeatureList from "ol-ext/control/FeatureList";
 import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
-import {toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4, getCorners, WorldPixels2Meters} from './utils';
 import * as tf from '@tensorflow/tfjs';
+import {toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4, getCorners, WorldPixels2Meters} from './utils';
 import {NMMPostprocess, convertOPstoFCs, convertFCstoOPs} from './postprocess';
 
 const style = new Style({
@@ -1101,46 +1101,52 @@ showSegments.onchange = function () {
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
 async function nmsPredictions(featuresInExtent, zoom) {
     // create boxes, scores, and classes from feature values
-    let boxes = [];
+    let geoms = [];
+    let bounds = [];
     let scores = [];
     let classes = [];
     featuresInExtent.forEach((feature) => {
-        const [minx, miny, maxx, maxy] = feature.getGeometry().getExtent();
+        const geom = feature.getGeometry().getCoordinates()[0];
+        const [minx, miny, maxx, maxy] = feature.get('bounds');
         const [px0, py0] = meter2pixel(minx, maxy, zoom);
         const [px1, py1] = meter2pixel(maxx, miny, zoom);
-        const bbox = [px0, py0, px1, py1];
-        boxes.push(bbox);
+        geoms.push(geom);
+        bounds.push([px0, py0, px1, py1]);
         scores.push(feature.get('score'));
         classes.push(feature.get('classIndex'));
     });
 
     // run nms
-    const boxesTensor = tf.tensor2d(boxes, [boxes.length, 4]); // [x, 4]
+    const boundsTensor = tf.tensor2d(bounds, [bounds.length, 4]); // [x, 4]
     const scoresTensor = tf.tensor1d(scores); // [x]
+    const geometryTensor = tf.tensor3d(geoms, [bounds.length, 5, 2]);
     // const nmsIndices = await tf.image.nonMaxSuppressionAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .5)
-    const nms_results = await tf.image.nonMaxSuppressionWithScoreAsync(boxesTensor, scoresTensor, scores.length, .5, .5, .1);
+    const nms_results = await tf.image.nonMaxSuppressionWithScoreAsync(boundsTensor, scoresTensor, scores.length, .5, .5, .1);
     // console.log(nms_results, nms_results.selectedIndices, nmsIndices);
 
     // gather results
-    const gatheredBoxes = boxesTensor.gather(nms_results.selectedIndices);
+    const gatheredGeoms = geometryTensor.gather(nms_results.selectedIndices); // float32 for class keypoints
+    const gatheredBounds = boundsTensor.gather(nms_results.selectedIndices);
     const gatheredScores = scoresTensor.gather(nms_results.selectedIndices);
     const gatheredClasses = tf.gather(tf.tensor1d(classes, 'int32'), nms_results.selectedIndices); // int32 for class indices
 
-    const boxesData = await gatheredBoxes.array();
+    const geometryData = await gatheredGeoms.array();
+    const boundsData = await gatheredBounds.array();
     const scoresData = await gatheredScores.array();
     const classesData = await gatheredClasses.array();
 
     // replace the current features with the nms results
     const featureCollection = [];
     for (let i = 0; i < scoresData.length; i++) {
-        const bbox = boxesData[i];
+        const geom = geometryData[i];
+        const [px0, py0, px1, py1] = boundsData[i];
+        const [minx, maxy] = WorldPixels2Meters(px0, py0, zoom);
+        const [maxx, miny] = WorldPixels2Meters(px1, py1, zoom);
         const score = scoresData[i];
         const cls = classesData[i];
-        const worldPixels = getCorners(bbox);
-        const meters = worldPixels.map(([x, y]) => WorldPixels2Meters(x, y, zoom));
-        meters.push(meters[0]);
         const feature = new Feature({
-            geometry: new Polygon([meters]),
+            geometry: new Polygon([geom]),
+            bounds: [minx, miny, maxx, maxy],
             classIndex: cls,
             label: labels[cls],
             score: score,
@@ -1149,21 +1155,23 @@ async function nmsPredictions(featuresInExtent, zoom) {
     }
 
     // dispose tensors to free memory
-    boxesTensor.dispose();
+    boundsTensor.dispose();
+    geometryTensor.dispose();
     scoresTensor.dispose();
-    gatheredBoxes.dispose();
+    gatheredBounds.dispose();
+    gatheredGeoms.dispose();
     gatheredScores.dispose();
     gatheredClasses.dispose();
 
     return featureCollection
 }
 async function nmmWrapper(nmm_extent) {
-    const featuresInExtent = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
-    const objectPredictions = convertFCstoOPs(featuresInExtent, intZoom);
-    const objectPredictions2 = nmm_postprocess.call(objectPredictions);
-    const featureCollection2 = convertOPstoFCs(objectPredictions2, intZoom);
-    const featureCollection3 = await nmsPredictions(featureCollection2, intZoom);
-    activePredictionLayer.getSource().removeFeatures(featuresInExtent);
+    const featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
+    // const objectPredictions1 = convertFCstoOPs(featureCollection1, intZoom);
+    // const objectPredictions2 = nmm_postprocess.call(objectPredictions1);
+    // const featureCollection2 = convertOPstoFCs(objectPredictions2, intZoom);
+    const featureCollection3 = await nmsPredictions(featureCollection1, intZoom);
+    activePredictionLayer.getSource().removeFeatures(featureCollection1);
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
 
@@ -1189,17 +1197,17 @@ tfjs_worker.onmessage = function (event) {
         predictButton.setDisable(true);
     }
     // Handle the results if the model is ready
-    if (results) { // results.corners, results.classIndex, results.label, results.score
+    if (results) { // results.geometry, results.bounds, results.classIndex, results.label, results.score
         results.forEach(result => {
-            let corners = result.corners.map(cord => [cord[0], cord[1]]);
-            corners.push(corners[0]);
-            const boxFeature = new Feature({
-                geometry: new Polygon([corners]),
+            result.geometry.push(result.geometry[0]);
+            const feature = new Feature({
+                geometry: new Polygon([result.geometry]),
+                bounds: result.bounds,
                 classIndex: result.classIndex,
                 label: result.label,
                 score: result.score
             });
-            activePredictionLayer.getSource().addFeature(boxFeature);
+            activePredictionLayer.getSource().addFeature(feature);
         });
     }
     // run nmm (and nms) on all predictions
