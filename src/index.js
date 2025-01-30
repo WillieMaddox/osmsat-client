@@ -800,7 +800,7 @@ let featurelist = new FeatureList({
     collapsed: true,
 });
 map.addControl(featurelist);
-featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon')
+featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon', 'label', 'score')
 featurelist.on('select', function(e) {
     select.getFeatures().clear();
     select.getFeatures().push(e.feature);
