@@ -1,0 +1,21 @@
+description: Ultralytics YOLO11m-pose model trained on /mnt/M22TB/DATA/peopletec/datasets/CivPlanes/smart_slice_512_0/class_1/yolo-pose/data.yaml
+author: Ultralytics
+date: '2025-01-28T16:15:31.999811'
+version: 8.3.61
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: pose
+batch: 8
+imgsz:
+- 512
+- 512
+names:
+  0: airplane
+args:
+  batch: 8
+  half: true
+  int8: false
+kpt_shape:
+- 4
+- 2
