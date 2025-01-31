@@ -15,6 +15,7 @@ const NMS_SCORE_THRESHOLD = 0.25;
 async function loadModel(model_name) {
     // load model metadata
     let t0 = performance.now();
+    console.log(`LOADING MODEL ${model_name}`);
     const metadata_url = `${base_dir}/models/${model_name}/metadata.yaml`;
     const response = await fetch(metadata_url);
     const text = await response.text();
@@ -25,19 +26,18 @@ async function loadModel(model_name) {
     num_classes = Object.entries(labels).length;
     batch_size = metadata.batch;
     self.postMessage({ labels: labels });
-    console.log(`task: ${task}, imgsz: ${imgsz}, num_classes: ${num_classes}`)
-    console.log(`batch_size: ${batch_size}, half: ${metadata.args.half}, int8: ${metadata.args.int8}`);
-    console.log(`model metadata loaded in ${(performance.now() - t0) / 1000} seconds`);
+    console.log(`  task: ${task}, imgsz: ${imgsz}, num_classes: ${num_classes}`)
+    console.log(`  batch_size: ${batch_size}, half: ${metadata.args.half}, int8: ${metadata.args.int8}`);
+    console.log(`  metadata loaded in ${(performance.now() - t0) / 1000} seconds`);
     // load model
     t0 = performance.now();
-    console.log(`model loading ${model_name}`);
     const model_url = `${base_dir}/models/${model_name}/model.json`;
     model = await tf.loadGraphModel(model_url);
     const dummyInput = tf.ones(model.inputs[0].shape);
     const warmupResults = model.predict(dummyInput);
     dummyInput.dispose();
     warmupResults.dispose();
-    console.log(`model loaded in ${(performance.now() - t0) / 1000} seconds`);
+    console.log(`  model loaded in ${(performance.now() - t0) / 1000} seconds`);
 }
 async function fetchImage(url) {
     const response = await fetch(url);
@@ -175,7 +175,6 @@ async function processTiles(tiles) {
         }
         const results = convertDetections(geometry, bounds, scores.flat(), classes.flat(), chunk);
         self.postMessage({results: results});
-        console.log('batch completed in:', (performance.now() - t0) / 1000, 'seconds');
     }
 }
 
