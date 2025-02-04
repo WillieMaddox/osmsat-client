@@ -28,7 +28,6 @@ html, body {
     left: 50%;
     right: auto;
     width: 41vw;
-    padding: 1px .5em;
     z-index: 50;
     transform: translateX(-50%);
     justify-content: center;
@@ -66,8 +65,16 @@ html, body {
 .field-CSV {
     background: var(--ol-partial-background-color);
     width: 20vw;
-    height: 1.5rem;
-    margin-bottom: 5px;
+    height: 1.0rem;
+    margin: 2px;
+}
+.CopyIcon {
+    border-radius: 5px;
+    background-color: var(--ol-partial-background-color);
+}
+.CopyIcon:hover {
+    box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
+    cursor: pointer;
 }
 
 .ol-custom-mouse-position {

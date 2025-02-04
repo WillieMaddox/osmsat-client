@@ -1176,6 +1176,20 @@ async function nmmWrapper(nmm_extent) {
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
 
+// copy to clipboard function
+function copyToClipboard() {
+    const copyText = document.getElementById('bbox');
+    navigator.clipboard.writeText(copyText.value)
+        .then(() => {
+            console.log('Text copied to clipboard successfully!');
+        })
+        .catch(err => {
+            console.error('Failed to copy text: ', err);
+        });
+}
+const copyButton = document.getElementById('CopyToClipboard');
+copyButton.addEventListener('click', copyToClipboard, { passive: true });
+
 const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
 document.addEventListener('DOMContentLoaded', function () {
     tfjs_worker.postMessage({ model: "CivPlanes_detect_1_160k_08_half_web_model" });
