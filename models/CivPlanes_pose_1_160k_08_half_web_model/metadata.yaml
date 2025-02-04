@@ -1,6 +1,6 @@
-description: Ultralytics YOLO11m-pose model trained on /mnt/M22TB/DATA/peopletec/datasets/CivPlanes/smart_slice_512_0/class_1/yolo-pose/data.yaml
+description: Ultralytics YOLO11s-pose model trained on /mnt/M22TB/DATA/peopletec/datasets/CivPlanes/smart_slice_512_0/class_1/yolo-pose/data.yaml
 author: Ultralytics
-date: '2025-01-28T16:15:31.999811'
+date: '2025-01-30T14:59:08.120176'
 version: 8.3.61
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com

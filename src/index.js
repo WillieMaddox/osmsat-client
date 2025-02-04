@@ -750,7 +750,6 @@ let predictButton = new Button({
     disabled: true,
     handleClick: function () {
         runModelOnTiles();
-        // modelElement.style.display = active ? 'flex' : 'none';
     }
 });
 mainbar.addControl(predictButton);
@@ -777,6 +776,19 @@ map.on('rendercomplete', function (e) {
         }
     }
 });
+
+// Add a button to toggle the model menu.
+let modelToggle = new Toggle({
+    title: "Model",
+    className: "model-button",
+    html: '<i class="fa-solid fa-hexagon-nodes"></i>',
+    disabled: false,
+    onToggle: function (active) {
+        $('#modelInfoElement')[0].style.display = active ? 'flex' : 'none';
+    }
+});
+mainbar.addControl(modelToggle);
+
 // An overlay that stay on top
 let debugLayer = new TileLayer({
     title: "Debug Tiles",
@@ -929,6 +941,7 @@ var nestedbar = new Bar ({ toggleOne: true, group: true });
 mainbar.addControl(nestedbar);
 
 // Add a toggle for drawing bounding boxes
+const bboxDisplayElement = document.getElementById('formatted');
 let bboxLayer = new VectorLayer({
     name: 'BBox',
     visible: false,
@@ -950,6 +963,7 @@ bboxToggle.on('change:active', function (e) {
     bboxLayer.getSource().clear();
     bboxInteraction.setActive(e.active);
     bboxLayer.setVisible(e.active);
+    bboxDisplayElement.style.display = e.active ? '' : 'none';
 });
 nestedbar.addControl(bboxToggle);
 let bboxInteraction = new DrawRegular({
@@ -976,9 +990,9 @@ bboxInteraction.on('drawing', function (e) {
 const typeSelect = document.getElementById('type');
 const showSegments = document.getElementById('segments');
 const clearPrevious = document.getElementById('clear');
+const measureElement = document.getElementById('measure');
 const measureSource = new VectorSource();
 const measureModify = new Modify({ source: measureSource, style: modifyStyle });
-
 let tipPoint;
 function styleFunction(feature, segments, drawType, tip) {
     const styles = [];
@@ -1028,7 +1042,6 @@ function styleFunction(feature, segments, drawType, tip) {
     }
     return styles;
 }
-
 const measureLayer = new VectorLayer({
     source: measureSource,
     style: function (feature) {
@@ -1050,10 +1063,10 @@ measureToggle.on('change:active', function (e) {
     typeSelect.disabled = !e.active;
     showSegments.disabled = !e.active;
     clearPrevious.disabled = !e.active;
+    measureElement.style.display = e.active ? '' : 'none';
 });
 nestedbar.addControl(measureToggle);
 map.addInteraction(measureModify);
-
 let measureDraw; // global so we can remove it later
 function addInteraction() {
     const drawType = typeSelect.value;
@@ -1175,26 +1188,65 @@ async function nmmWrapper(nmm_extent) {
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
 
+// copy to clipboard function
+function copyToClipboard() {
+    const copyText = document.getElementById('bbox');
+    navigator.clipboard.writeText(copyText.value)
+        .then(() => {
+            console.log('Text copied to clipboard successfully!');
+        })
+        .catch(err => {
+            console.error('Failed to copy text: ', err);
+        });
+}
+const copyButton = document.getElementById('CopyToClipboard');
+copyButton.addEventListener('click', copyToClipboard, { passive: true });
+
+const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
 document.addEventListener('DOMContentLoaded', function () {
-    tfjs_worker.postMessage({ model: "CivPlanes_detect_1_160k_08_half_web_model" });
     document.body.classList.add('hideOpacity')
 }, { passive: true });
-
-// YOLO predict code
-const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
+$('#modelName').on('change', (e) => {
+    tfjs_worker.postMessage({ model: e.target.value });
+})
+function loadDefaultModel() {
+    const default_model = 'CivPlanes_detect_1_160k_08_half_web_model'
+    $('#modelName').val(default_model).trigger('change')
+}
+function loadModelOptions(directories) {
+    const $dropdown = $('#modelName');
+    $dropdown.empty().append($('<option value="">Select a model</option>'));
+    directories.forEach(dir => {
+        $dropdown.append($(`<option value="${dir}">${dir}</option>`));
+    });
+    tfjs_worker.postMessage({ options_loaded: true });
+}
 tfjs_worker.postMessage({ url: document.URL });
-
+tfjs_worker.postMessage({ loadModelDirectories: true });
 // Listen for messages from the worker
+let modelLoadingStatusElement = document.getElementById('modelLoadingStatus');
 tfjs_worker.onmessage = function (event) {
-    const { ready, results, labels, error, nmm_extent } = event.data;
+    const { directories, options_loaded, ready, results, labels, error, nmm_extent } = event.data;
 
+    if (directories) {
+        // console.log('Main thread: Directories received:', directories);
+        loadModelOptions(directories)
+    }
+    if (options_loaded === true) {
+        // console.log('Worker: Received options_loaded = true');
+        loadDefaultModel();
+    }
     if (ready === true) {
         predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
         predictButton.setDisable(false);
+        modelLoadingStatusElement.innerHTML = 'Loaded';
+        modelLoadingStatusElement.style.backgroundColor = 'rgb(0, 165, 255)';
     }
     if (ready === false) {
         predictButton.setHtml('<i class="fa-solid fa-bolt" style="opacity: 0.5;"></i>');
         predictButton.setDisable(true);
+        modelLoadingStatusElement.innerHTML = 'Loading';
+        modelLoadingStatusElement.style.backgroundColor = 'rgb(255, 165, 0)';
     }
     // Handle the results if the model is ready
     if (results) { // results.geometry, results.bounds, results.classIndex, results.label, results.score
@@ -1247,7 +1299,6 @@ function toggleUI() {
     document.getElementsByClassName('ol-overlaycontainer')[0].style.display = document.getElementsByClassName('ol-overlaycontainer')[0].style.display === 'none' ? '' : 'none';
     document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display = document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display === 'none' ? '' : 'none';
     document.getElementById('panel').style.display = document.getElementById('panel').style.display === 'none' ? '' : 'none';
-    document.getElementById('map').style.bottom = document.getElementById('map').style.bottom === '0px' ? '50px' : '0px';
 }
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
@@ -1256,7 +1307,7 @@ document.addEventListener('keydown', function (event) {
     const predictElement = document.querySelectorAll('button[type=button][title="Predict"]')[0];
     const measureElement = document.querySelectorAll('button[type=button][title="Measure"]')[0];
     const bboxElement = document.querySelectorAll('button[type=button][title="Bounding Box"]')[0];
-
+    const modelInfoElement = $('#modelInfoElement')[0]
     // if the search bar is not "ol-collapsed", then we must be using it so dont do shortcuts
     if (document.getElementsByClassName('nominatim ol-search ol-unselectable ol-control ol-collapsed').length != 1) {
         return;
@@ -1270,6 +1321,8 @@ document.addEventListener('keydown', function (event) {
         measureElement.click();
     } else if (event.key === 'b') {
         bboxElement.click();
+    } else if (event.key === 'l') {
+        modelInfoElement.style.display = modelInfoElement.style.display === 'flex' ? 'none' : 'flex';
     } else if (event.key === 'h') { // hide everything but the map
         toggleUI()
     }

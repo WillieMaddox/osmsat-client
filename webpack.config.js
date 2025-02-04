@@ -19,6 +19,7 @@ const commonConfig = merge([
           { from: "models", to: "models" },
         ],
       }),
+      parts.generateModelListPlugin(),
     ],
   },
   // { entry: ["./src"] },

@@ -8,28 +8,77 @@
 <!--    <link rel="stylesheet" href="node_modules/ol-ext/dist/ol-ext.css" />-->
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/js/all.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <style>
+      #loader {
+        border: 12px solid #6c6c6c;
+        border-radius: 50%;
+        border-top: 12px solid #f3f3f3;
+        width: 70px;
+        height: 70px;
+        animation: spin 1s linear infinite;
+      }
+
+      .center {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        margin: auto;
+      }
+
+      html {
+        background-color: #3b3b3b;
+      }
+
+      @keyframes spin {
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="map"></div>
-    <div id="panel">
-      <div id="formatted">
+    <div id="loader" class="center"></div>
+    <div id="map">
+    <div id="panel" class="ol-attribution">
+      <div id="formatted" style="display:none">
         <input class="field-CSV" type="text" id="bbox" readonly>
+        <button class="CopyIcon" id="CopyToClipboard">
+          <i class="fa-solid fa-copy"></i> Copy
+        </button>
       </div>
-      &nbsp;&nbsp;&nbsp;&nbsp;
-      <div id="measure">
-        <label for="type">Measurement type &nbsp;</label>
+      <div id="modelInfoElement">
+        <div id="modelLoadingStatus">Loading</div>
+        <div>
+          <label for="modelName">Model:</label>
+          <select id="modelName"></select>
+        </div>
+      </div>
+      <div id="measure" style="display:none">
+        <label for="type">Measurement type:</label>
         <select id="type" disabled>
           <option value="LineString">Length (LineString)</option>
           <option value="Polygon">Area (Polygon)</option>
         </select>
-        &nbsp;&nbsp;&nbsp;&nbsp;
-        <label for="segments">Show segment lengths:&nbsp;</label>
+        <label for="segments" style="padding: 0 5px">Show segment lengths:</label>
         <input type="checkbox" id="segments" checked disabled/>
-        &nbsp;&nbsp;&nbsp;&nbsp;
-        <label for="clear">Clear previous measure:&nbsp;</label>
+        <label for="clear" style="padding: 0 5px">Clear previous measure:</label>
         <input type="checkbox" id="clear" checked disabled/>
       </div>
+    </div>
 <!--      <div style="background:white; padding:0 0.45em;"><span id="info"></span>&nbsp;</div>-->
     </div>
+    <script>
+      document.onreadystatechange = function () {
+        if (document.readyState !== "complete") {
+          document.querySelector("body").style.visibility = "hidden";
+          document.querySelector("#loader").style.visibility = "visible";
+        } else {
+          document.querySelector("#loader").style.display = "none";
+          document.querySelector("body").style.visibility = "visible";
+        }
+      };
+    </script>
   </body>
 </html>

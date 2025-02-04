@@ -1,4 +1,5 @@
 const glob = require('glob');
+const fs = require("fs");
 const path = require("path");
 // const webpack = require("webpack");
 const Dotenv = require('dotenv-webpack');
@@ -149,4 +150,30 @@ exports.env = ({ mode }) => ({
 
 exports.setExtraPlugins = pluginsArray => ({
   plugins: pluginsArray
+});
+
+exports.generateModelListPlugin = () => ({
+  apply: (compiler) => {
+    compiler.hooks.afterEmit.tapAsync("GenerateModelList", (compilation, callback) => {
+      const modelsDir = path.resolve(__dirname, "models");
+      const outputPath = path.join(compilation.options.output.path, "models.json");
+
+      // Get only directories from models/
+      const modelFolders = fs.existsSync(modelsDir)
+          ? fs.readdirSync(modelsDir).filter(name =>
+              fs.statSync(path.join(modelsDir, name)).isDirectory())
+          : [];
+
+      // Write models.json file
+      const jsonContent = JSON.stringify(modelFolders, null, 2);
+      fs.writeFile(outputPath, jsonContent, (err) => {
+        if (err) {
+          console.error("❌ Failed to generate models.json:", err);
+        } else {
+          console.log("✅ models.json generated successfully!");
+        }
+        callback();
+      });
+    });
+  },
 });
