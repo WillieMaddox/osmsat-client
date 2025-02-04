@@ -16,6 +16,7 @@ html, body {
     width: 100%;
     background: rgb(229, 227, 223);
 }
+
 #panel {
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12pt;
@@ -62,6 +63,7 @@ html, body {
     bottom: 2.0em;
     /*text-decoration: none;*/
 }
+
 .field-CSV {
     background: var(--ol-partial-background-color);
     width: 20vw;
@@ -75,6 +77,20 @@ html, body {
 .CopyIcon:hover {
     box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
     cursor: pointer;
+}
+
+#modelInfoElement {
+    display: none;
+    padding: 5px 0px;
+    justify-content: space-around;
+    width: 95%;
+}
+#modelLoadingStatus {
+    background-color: rgb(255, 165, 0);
+    padding: 0 5px;
+    border-radius: 8px;
+    border: 1px solid #000;
+    color: #fff;
 }
 
 .ol-custom-mouse-position {

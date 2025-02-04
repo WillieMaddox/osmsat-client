@@ -195,6 +195,15 @@ self.onmessage = async function (event) {
         await loadModel(event.data.model);
         self.postMessage({ ready: true });
     }
+    if (event.data.loadModelDirectories) {
+        const response = await fetch("models.json"); // Fetch generated JSON file
+        const directories = await response.json();
+        self.postMessage({ directories: directories });
+    }
+    if (event.data.options_loaded) {
+        // console.log('Worker: Received options_loaded = true');
+        self.postMessage({ options_loaded: true });
+    }
     if (event.data.url) {
         const url = event.data.url;
         if (url.endsWith('.html')) {
