@@ -12,28 +12,30 @@ html, body {
     /*top: 55px;*/
     /*left: 20px;*/
     /*right: 20px;*/
-    bottom:50px;
-    /*bottom: 0;*/
+    bottom: 0;
     width: 100%;
     background: rgb(229, 227, 223);
 }
 #panel {
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 9pt;
+    font-size: 12pt;
 
-    display: flex;
+    background-color: var(--ol-partial-background-color);
+    flex-flow: column;
+    border-radius: 5px;
     position: absolute;
-    bottom:10px;
-    left:10px;
-    right:10px;
-    height:20px;
-    padding:5px;
-
-    border: 1px solid #eee;
-}
-#formatted input {
-  width:550px;
-  margin-left: 10px;
+    bottom: 0rem;
+    left: 50%;
+    right: auto;
+    width: 41vw;
+    padding: 1px .5em;
+    z-index: 50;
+    transform: translateX(-50%);
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    color: var(--ol-foreground-color);
+    text-shadow: 0 0 2px var(--ol-background-color);
 }
 #LeftLayerLabel {
     position: absolute;
@@ -61,6 +63,13 @@ html, body {
     bottom: 2.0em;
     /*text-decoration: none;*/
 }
+.field-CSV {
+    background: var(--ol-partial-background-color);
+    width: 20vw;
+    height: 1.5rem;
+    margin-bottom: 5px;
+}
+
 .ol-custom-mouse-position {
     position: absolute;
     left: 1em;

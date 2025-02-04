@@ -40,25 +40,23 @@
   </head>
   <body>
     <div id="loader" class="center"></div>
-    <div id="map"></div>
-    <div id="panel">
-      <div id="formatted">
+    <div id="map">
+    <div id="panel" class="ol-attribution">
+      <div id="formatted" style="display:none">
         <input class="field-CSV" type="text" id="bbox" readonly>
       </div>
-      &nbsp;&nbsp;&nbsp;&nbsp;
-      <div id="measure">
-        <label for="type">Measurement type &nbsp;</label>
+      <div id="measure" style="display:none">
+        <label for="type">Measurement type:</label>
         <select id="type" disabled>
           <option value="LineString">Length (LineString)</option>
           <option value="Polygon">Area (Polygon)</option>
         </select>
-        &nbsp;&nbsp;&nbsp;&nbsp;
-        <label for="segments">Show segment lengths:&nbsp;</label>
+        <label for="segments" style="padding: 0 5px">Show segment lengths:</label>
         <input type="checkbox" id="segments" checked disabled/>
-        &nbsp;&nbsp;&nbsp;&nbsp;
-        <label for="clear">Clear previous measure:&nbsp;</label>
+        <label for="clear" style="padding: 0 5px">Clear previous measure:</label>
         <input type="checkbox" id="clear" checked disabled/>
       </div>
+    </div>
 <!--      <div style="background:white; padding:0 0.45em;"><span id="info"></span>&nbsp;</div>-->
     </div>
     <script>

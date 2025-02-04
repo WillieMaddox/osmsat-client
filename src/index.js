@@ -929,6 +929,7 @@ var nestedbar = new Bar ({ toggleOne: true, group: true });
 mainbar.addControl(nestedbar);
 
 // Add a toggle for drawing bounding boxes
+const bboxDisplayElement = document.getElementById('formatted');
 let bboxLayer = new VectorLayer({
     name: 'BBox',
     visible: false,
@@ -950,6 +951,7 @@ bboxToggle.on('change:active', function (e) {
     bboxLayer.getSource().clear();
     bboxInteraction.setActive(e.active);
     bboxLayer.setVisible(e.active);
+    bboxDisplayElement.style.display = e.active ? '' : 'none';
 });
 nestedbar.addControl(bboxToggle);
 let bboxInteraction = new DrawRegular({
@@ -976,9 +978,9 @@ bboxInteraction.on('drawing', function (e) {
 const typeSelect = document.getElementById('type');
 const showSegments = document.getElementById('segments');
 const clearPrevious = document.getElementById('clear');
+const measureElement = document.getElementById('measure');
 const measureSource = new VectorSource();
 const measureModify = new Modify({ source: measureSource, style: modifyStyle });
-
 let tipPoint;
 function styleFunction(feature, segments, drawType, tip) {
     const styles = [];
@@ -1028,7 +1030,6 @@ function styleFunction(feature, segments, drawType, tip) {
     }
     return styles;
 }
-
 const measureLayer = new VectorLayer({
     source: measureSource,
     style: function (feature) {
@@ -1050,10 +1051,10 @@ measureToggle.on('change:active', function (e) {
     typeSelect.disabled = !e.active;
     showSegments.disabled = !e.active;
     clearPrevious.disabled = !e.active;
+    measureElement.style.display = e.active ? '' : 'none';
 });
 nestedbar.addControl(measureToggle);
 map.addInteraction(measureModify);
-
 let measureDraw; // global so we can remove it later
 function addInteraction() {
     const drawType = typeSelect.value;
@@ -1175,15 +1176,13 @@ async function nmmWrapper(nmm_extent) {
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
 
+const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
 document.addEventListener('DOMContentLoaded', function () {
     tfjs_worker.postMessage({ model: "CivPlanes_detect_1_160k_08_half_web_model" });
     document.body.classList.add('hideOpacity')
 }, { passive: true });
 
-// YOLO predict code
-const tfjs_worker = new Worker(new URL("./worker.js", import.meta.url));
 tfjs_worker.postMessage({ url: document.URL });
-
 // Listen for messages from the worker
 tfjs_worker.onmessage = function (event) {
     const { ready, results, labels, error, nmm_extent } = event.data;
