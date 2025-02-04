@@ -163,6 +163,8 @@ html, body {
     background-color: currentColor!important;
     border-color: #000;
 }
-.ol-scale-line {
-    left: 2.2em;
+.ol-control.ol-feature-list > button {
+    position: fixed;
+    right: 0.5em;
+    bottom: 0.5em;
 }
