@@ -1260,7 +1260,6 @@ function toggleUI() {
     document.getElementsByClassName('ol-overlaycontainer')[0].style.display = document.getElementsByClassName('ol-overlaycontainer')[0].style.display === 'none' ? '' : 'none';
     document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display = document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display === 'none' ? '' : 'none';
     document.getElementById('panel').style.display = document.getElementById('panel').style.display === 'none' ? '' : 'none';
-    document.getElementById('map').style.bottom = document.getElementById('map').style.bottom === '0px' ? '50px' : '0px';
 }
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
