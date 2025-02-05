@@ -801,6 +801,7 @@ let featurelist = new FeatureList({
     collapsed: true,
 });
 map.addControl(featurelist);
+featurelist.element.getElementsByTagName('button')[0].innerHTML = '<i class="fa-solid fa-table-list"></i>'
 featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon', 'label', 'score')
 let selectFeatureList;
 layerswitcherleft.on('info', function (e) {
@@ -927,6 +928,7 @@ search.on('select', function (e) {
         });
     }
 });
+$('.ol-search > button').html('<i class="fa-solid fa-magnifying-glass"></i>');
 
 /* Nested toolbar with one control activated at once */
 var nestedbar = new Bar ({ toggleOne: true, group: true });
