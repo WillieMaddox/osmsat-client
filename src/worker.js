@@ -161,10 +161,13 @@ async function processTiles(tiles) {
     let geometry, bounds, scores, classes;
     for (const chunk of chunks) {
         t0 = performance.now();
-        let images = [];
+        const images = [];
         for (const combo of chunk) {
             const imageData = await constructImages(combo);
-            images.push(tf.browser.fromPixels(imageData).div(255.0));
+            const img = tf.tidy(() => {
+                return tf.browser.fromPixels(imageData).div(255.0)
+            });
+            images.push(img);
         }
         if (task === "detect") {
             [geometry, bounds, scores, classes] = await detect(images);
@@ -173,6 +176,7 @@ async function processTiles(tiles) {
         } else if (task === "pose") {
             [geometry, bounds, scores, classes] = await pose(images);
         }
+        tf.dispose(images);
         const results = convertDetections(geometry, bounds, scores.flat(), classes.flat(), chunk);
         self.postMessage({results: results});
     }
@@ -183,9 +187,7 @@ self.onmessage = async function (event) {
         const t0 = performance.now();
         const tiles = Object.values(event.data.tiles);
         const viewExtent = getViewExtent(tiles);
-        tf.engine().startScope();
         await processTiles(tiles);
-        tf.engine().endScope();
         // postprocess all results (NMM, NMS, etc.)
         self.postMessage({ nmm_extent: viewExtent });
         console.log('Detection finished in :', (performance.now() - t0) / 1000, 'seconds');
@@ -216,10 +218,7 @@ self.onmessage = async function (event) {
 };
 
 export const detect = async (images) => {
-    let bounds_data = [];
-    let scores_data = [];
-    let classes_data = [];
-    let res, bounds, scores, classes;
+    let res;
 
     const batch = tf.stack(images);
 
@@ -232,7 +231,7 @@ export const detect = async (images) => {
             return tf.slice(tempRes, 0, batch.shape[0]);
         });
     }
-    [bounds, scores, classes] = tf.tidy(() => {
+    const [bounds_tensor, scores_tensor, classes_tensor] = tf.tidy(() => {
         const transRes = res.transpose([0, 2, 1]);
         const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
         const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
@@ -243,49 +242,50 @@ export const detect = async (images) => {
         const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]);
         return [tf.concat([x1, y1, x2, y2], 2), rawScores.max(2), rawScores.argMax(2)];
     });
-    bounds_data.push(bounds);
-    scores_data.push(scores);
-    classes_data.push(classes);
+    tf.dispose(images);
+    batch.dispose();
     res.dispose();
+    const bounds_data = bounds_tensor.unstack()
+    const scores_data = scores_tensor.unstack()
+    const classes_data = classes_tensor.unstack()
 
-    const bounds_tensor = tf.concat(bounds_data).unstack()
-    const scores_tensor = tf.concat(scores_data).unstack()
-    const classes_tensor = tf.concat(classes_data).unstack()
 
     let boxes_list = [];
     let bounds_list = [];
     let scores_list = [];
     let classes_list = [];
-    let bounds_array, scores_array, classes_array;
 
-    for (let i = 0; i < scores_tensor.length; i++) {
-        bounds = bounds_tensor[i];
-        scores = scores_tensor[i];
-        classes = classes_tensor[i];
+    for (let i = 0; i < scores_data.length; i++) {
+        const bounds = bounds_data[i];
+        const scores = scores_data[i];
+        const classes = classes_data[i];
 
         const nms = await tf.image.nonMaxSuppressionAsync(bounds, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
-        bounds_array = await bounds.gather(nms).array();
-        scores_array = await scores.gather(nms).array();
-        classes_array = await classes.gather(nms).array();
-
+        const [bounds_array, scores_array, classes_array] = tf.tidy(() => {
+            return [
+                bounds.gather(nms).arraySync(),
+                scores.gather(nms).arraySync(),
+                classes.gather(nms).arraySync()
+            ]
+        })
         boxes_list.push(bounds_array.map(box => getCorners(box)));
         bounds_list.push(bounds_array);
         scores_list.push(scores_array);
         classes_list.push(classes_array);
 
-        bounds.dispose();
-        scores.dispose();
-        classes.dispose();
         nms.dispose();
     }
+    tf.dispose(bounds_data);
+    tf.dispose(scores_data);
+    tf.dispose(classes_data);
+    bounds_tensor.dispose();
+    scores_tensor.dispose();
+    classes_tensor.dispose();
     return [boxes_list, bounds_list, scores_list, classes_list];
 };
 
 export const detectOBB = async (images) => {
-    let bounds_data = [];
-    let scores_data = [];
-    let classes_data = [];
-    let res, bounds, scores, classes;
+    let res;
 
     const batch = tf.stack(images);
 
@@ -298,7 +298,7 @@ export const detectOBB = async (images) => {
             return tf.slice(tempRes, 0, batch.shape[0]);
         });
     }
-    [bounds, scores, classes] = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
+    const [bounds_tensor, scores_tensor, classes_tensor] = tf.tidy(() => { // x, y, width, height, c1 ... cN, rotation
         const transRes = res.transpose([0, 2, 1]);
         const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
         const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
@@ -310,52 +310,54 @@ export const detectOBB = async (images) => {
         const rawScores = transRes.slice([0, 0, 4], [-1, -1, num_classes]);
         return [tf.concat([x1, y1, x2, y2, rotation], 2), rawScores.max(2), rawScores.argMax(2)];
     });
-    bounds_data.push(bounds);
-    scores_data.push(scores);
-    classes_data.push(classes);
+    tf.dispose(images);
+    batch.dispose();
     res.dispose();
-
-    const bounds_tensor = tf.concat(bounds_data).unstack()
-    const scores_tensor = tf.concat(scores_data).unstack()
-    const classes_tensor = tf.concat(classes_data).unstack()
+    const bounds_data = bounds_tensor.unstack()
+    const scores_data = scores_tensor.unstack()
+    const classes_data = classes_tensor.unstack()
 
     let boxes_list = [];
     let bounds_list = [];
     let scores_list = [];
     let classes_list = [];
-    let bounds_array, scores_array, classes_array;
 
-    for (let i = 0; i < scores_tensor.length; i++) {
-        bounds = bounds_tensor[i];
-        scores = scores_tensor[i];
-        classes = classes_tensor[i];
+    for (let i = 0; i < scores_data.length; i++) {
+        const bounds = bounds_data[i];
+        const scores = scores_data[i];
+        const classes = classes_data[i];
 
     // subselect the first 4 values of the box (x1, y1, x2, y2) for nms
         const nmsBounds = bounds.slice([0, 0], [-1, 4]);
         const nms = await tf.image.nonMaxSuppressionAsync(nmsBounds, scores, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
-        bounds_array = await bounds.gather(nms).array();
-        scores_array = await scores.gather(nms).array();
-        classes_array = await classes.gather(nms).array();
+        const [bounds_array, scores_array, classes_array] = tf.tidy(() => {
+            return [
+                bounds.gather(nms).arraySync(),
+                scores.gather(nms).arraySync(),
+                classes.gather(nms).arraySync()
+            ]
+        })
 
         boxes_list.push(bounds_array.map((box) => getCorners(box)));
         bounds_list.push(bounds_array);
         scores_list.push(scores_array);
         classes_list.push(classes_array);
 
-        bounds.dispose();
-        scores.dispose();
-        classes.dispose();
         nms.dispose();
+        nmsBounds.dispose();
     }
+    tf.dispose(bounds_data);
+    tf.dispose(scores_data);
+    tf.dispose(classes_data);
+    bounds_tensor.dispose();
+    scores_tensor.dispose();
+    classes_tensor.dispose();
     return [boxes_list, bounds_list, scores_list, classes_list];
 };
 
 export const pose = async (images) => {
-    let keypoints_data = [];
-    let bounds_data = [];
-    let bounds_scores_data = [];
-    let classes_data = [];
-    let res, keypoints, bounds, bounds_scores, classes;
+
+    let res;
 
     const batch = tf.stack(images);
 
@@ -368,7 +370,7 @@ export const pose = async (images) => {
             return tf.slice(tempRes, 0, batch.shape[0]);
         });
     }
-    [keypoints, bounds, bounds_scores, classes] = tf.tidy(() => {
+    const [keypoints_tensor, bounds_tensor, bounds_scores_tensor, classes_tensor] = tf.tidy(() => {
         const transRes = res.transpose([0, 2, 1]);
         const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
         const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
@@ -384,28 +386,25 @@ export const pose = async (images) => {
         const kpts = tf.stack([kp1, kp2, kp3, kp4], 2);
         return [kpts, tf.concat([x1, y1, x2, y2], 2), rawScores.max(2), rawScores.argMax(2)];
     });
-    keypoints_data.push(keypoints);
-    bounds_data.push(bounds);
-    bounds_scores_data.push(bounds_scores);
-    classes_data.push(classes);
+    tf.dispose(images);
+    batch.dispose();
     res.dispose();
 
-    const keypoints_tensor = tf.concat(keypoints_data).unstack()
-    const bounds_tensor = tf.concat(bounds_data).unstack()
-    const bounds_scores_tensor = tf.concat(bounds_scores_data).unstack()
-    const classes_tensor = tf.concat(classes_data).unstack()
+    const keypoints_data = keypoints_tensor.unstack()
+    const bounds_data = bounds_tensor.unstack()
+    const bounds_scores_data = bounds_scores_tensor.unstack()
+    const classes_data = classes_tensor.unstack()
 
     let keypoints_list = [];
     let bounds_list = [];
     let scores_list = [];
     let classes_list = [];
-    let keypoints_array, bounds_array, scores_array, classes_array;
 
-    for (let i = 0; i < bounds_tensor.length; i++) {
-        keypoints = keypoints_tensor[i].arraySync();
-        bounds = bounds_tensor[i].arraySync();
-        bounds_scores = bounds_scores_tensor[i].arraySync();
-        classes = classes_tensor[i].arraySync();
+    for (let i = 0; i < bounds_data.length; i++) {
+        let keypoints = keypoints_data[i].arraySync();
+        let bounds = bounds_data[i].arraySync();
+        let bounds_scores = bounds_scores_data[i].arraySync();
+        let classes = classes_data[i].arraySync();
 
         const lowScoresIdxs = bounds_scores.map((s, idx) => s > 0.8 ? idx : -1).filter(idx => idx !== -1);
         keypoints = lowScoresIdxs.map(idx => keypoints[idx]);
@@ -413,8 +412,8 @@ export const pose = async (images) => {
         bounds_scores = lowScoresIdxs.map(idx => bounds_scores[idx]);
         classes = lowScoresIdxs.map(idx => classes[idx]);
 
-        const keypointsScores = keypoints.map(kpts => getKeypointsScore(kpts));
-        const scores = bounds_scores.map((score, idx) => (score + keypointsScores[idx]) / 2);
+        const keypoints_scores = keypoints.map(kpts => getKeypointsScore(kpts));
+        const scores = bounds_scores.map((bounds_score, idx) => (bounds_score + keypoints_scores[idx]) / 2);
         const highScoresIdxs = scores.map((s, idx) => s > 0.9 ? idx : -1).filter(idx => idx !== -1);
 
         const filteredKeypoints = highScoresIdxs.map(idx => keypoints[idx]);
@@ -428,22 +427,34 @@ export const pose = async (images) => {
         const classesTensor = tf.tensor1d(filteredClasses, 'int32')
 
         const nms = await tf.image.nonMaxSuppressionAsync(boundsTensor, scoresTensor, 500, NMS_IOU_THRESHOLD, NMS_SCORE_THRESHOLD);
-        keypoints_array = await keypointsTensor.gather(nms).array();
-        bounds_array = await boundsTensor.gather(nms).array();
-        scores_array = await scoresTensor.gather(nms).array();
-        classes_array = await classesTensor.gather(nms).array();
+        const [keypoints_array, bounds_array, scores_array, classes_array] = tf.tidy(() => {
+            return [
+                keypointsTensor.gather(nms).arraySync(),
+                boundsTensor.gather(nms).arraySync(),
+                scoresTensor.gather(nms).arraySync(),
+                classesTensor.gather(nms).arraySync()
+            ]
+        })
 
         keypoints_list.push(keypoints_array);
         bounds_list.push(bounds_array);
         scores_list.push(scores_array);
         classes_list.push(classes_array);
 
+        nms.dispose();
         keypointsTensor.dispose();
         boundsTensor.dispose();
         scoresTensor.dispose();
         classesTensor.dispose();
-        nms.dispose();
     }
+    tf.dispose(keypoints_data);
+    tf.dispose(bounds_data);
+    tf.dispose(bounds_scores_data);
+    tf.dispose(classes_data);
+    keypoints_tensor.dispose();
+    bounds_tensor.dispose();
+    bounds_scores_tensor.dispose();
+    classes_tensor.dispose();
     return [keypoints_list, bounds_list, scores_list, classes_list];
 };
 
