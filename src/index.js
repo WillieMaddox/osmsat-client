@@ -1280,22 +1280,19 @@ function loadModelOptions(directories) {
     for (let i = 15; i <= 20; i++) {
         $modelZooms.append($(`<option value="${i}">${i}</option>`));
     }
-    tfjs_worker.postMessage({ options_loaded: true });
+    loadDefaultModel();
 }
 tfjs_worker.postMessage({ url: document.URL });
 tfjs_worker.postMessage({ loadModelDirectories: true });
 // Listen for messages from the worker
 let modelLoadingStatusElement = document.getElementById('modelLoadingStatus');
 tfjs_worker.onmessage = function (event) {
-    const { directories, options_loaded, ready, results, labels, error, nmm_extent } = event.data;
+    console.log('Main thread: Message received from worker', event.data);
+    const { directories, ready, results, labels, error, nmm_extent } = event.data;
 
     if (directories) {
         // console.log('Main thread: Directories received:', directories);
         loadModelOptions(directories)
-    }
-    if (options_loaded === true) {
-        // console.log('Worker: Received options_loaded = true');
-        loadDefaultModel();
     }
     if (ready === true) {
         predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
