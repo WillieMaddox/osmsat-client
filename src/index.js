@@ -1240,14 +1240,20 @@ $('#modelName').on('change', (e) => {
 })
 function loadDefaultModel() {
     const default_model = 'CivPlanes_detect_1_160k_08_half_web_model'
+    const default_model_zoom = 19;
     $('#modelName').val(default_model).trigger('change')
+    $('#modelZoom').val(default_model_zoom).trigger('change')
 }
 function loadModelOptions(directories) {
-    const $dropdown = $('#modelName');
-    $dropdown.empty().append($('<option value="">Select a model</option>'));
+    const $modelNames = $('#modelName');
+    $modelNames.empty().append($('<option value="">Select a model</option>'));
     directories.forEach(dir => {
-        $dropdown.append($(`<option value="${dir}">${dir}</option>`));
+        $modelNames.append($(`<option value="${dir}">${dir}</option>`));
     });
+    const $modelZooms = $('#modelZoom');
+    for (let i = 15; i <= 20; i++) {
+        $modelZooms.append($(`<option value="${i}">${i}</option>`));
+    }
     tfjs_worker.postMessage({ options_loaded: true });
 }
 tfjs_worker.postMessage({ url: document.URL });
@@ -1318,7 +1324,7 @@ function runModelOnTiles() {
     tfjs_worker.postMessage({ tiles: tiles });
 }
 async function get_tiles_from_cord_box(box) {
-    let z = 19;
+    let z = $('#modelZoom').val();
     let [x0, y0] = meter2tile2(box[0], box[1], z);
     let [x1, y1] = meter2tile2(box[2], box[3], z);
     // Collect all tiles within the bounding box
