@@ -1239,7 +1239,7 @@ $('#modelName').on('change', (e) => {
     tfjs_worker.postMessage({ model: e.target.value });
 })
 function loadDefaultModel() {
-    const default_model = 'CivPlanes_detect_1_160k_08_half_web_model'
+    const default_model = 'CivPlanes_detect_1_08_half_160k'
     const default_model_zoom = 19;
     $('#modelName').val(default_model).trigger('change')
     $('#modelZoom').val(default_model_zoom).trigger('change')
