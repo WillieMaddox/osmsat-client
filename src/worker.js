@@ -13,6 +13,7 @@ const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
 async function loadModel(model_name) {
+    if (model) model.dispose();
     // load model metadata
     let t0 = performance.now();
     console.log(`LOADING MODEL ${model_name}`);
