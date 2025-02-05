@@ -806,36 +806,38 @@ let debugLayerToggle = new Toggle({
 });
 mainbar.addControl(debugLayerToggle);
 
-// Select control
+// Feature List control
 let featurelist = new FeatureList({
     title: 'Detections',
     collapsed: true,
 });
 map.addControl(featurelist);
 featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon', 'label', 'score')
-featurelist.on('select', function(e) {
-    select.getFeatures().clear();
-    select.getFeatures().push(e.feature);
-});
-featurelist.on('dblclick', function(e) {
-    map.getView().fit(e.feature.getGeometry().getExtent())
-    map.getView().setZoom(Math.min(map.getView().getZoom(), 20) - 1)
-});
-const select = new Select({
-    hitTolerance: 5,
-    condition: singleClick
-});
-map.addInteraction(select);
-select.on('select', function(e) {
-    const f = e.selected[0];
-    if (f) {
-        featurelist.select(f)
-    }
-});
-
+let selectFeatureList;
 layerswitcherleft.on('info', function (e) {
     if (!e.layer.get('baseLayer')) {
         featurelist.setFeatures(e.layer.getSource())
+        map.removeInteraction(selectFeatureList);
+        selectFeatureList = new Select({
+            hitTolerance: 5,
+            condition: singleClick,
+            layers: [e.layer],
+        });
+        map.addInteraction(selectFeatureList);
+        featurelist.on('select', function(e) {
+            selectFeatureList.getFeatures().clear();
+            selectFeatureList.getFeatures().push(e.feature);
+        });
+        featurelist.on('dblclick', function(e) {
+            map.getView().fit(e.feature.getGeometry().getExtent())
+            map.getView().setZoom(Math.min(map.getView().getZoom(), 20) - 1)
+        });
+        selectFeatureList.on('select', function(e) {
+            const f = e.selected[0];
+            if (f) {
+                featurelist.select(f)
+            }
+        });
     }
 });
 
