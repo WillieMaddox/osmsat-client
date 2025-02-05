@@ -206,7 +206,8 @@ const formatArea = function (polygon) {
     return output;
 };
 
-let zoom = 19, center = [-110.8605, 32.1666];
+let zoom = 16, center = [-110.848, 32.163];
+let predictBoxList = [];
 
 let thunderforestAttributions = [
     'Tiles &copy; <a href="https://www.thunderforest.com/">Thunderforest</a>',
@@ -777,18 +778,6 @@ map.on('rendercomplete', function (e) {
     }
 });
 
-// Add a button to toggle the model menu.
-let modelToggle = new Toggle({
-    title: "Model",
-    className: "model-button",
-    html: '<i class="fa-solid fa-hexagon-nodes"></i>',
-    disabled: false,
-    onToggle: function (active) {
-        $('#modelInfoElement')[0].style.display = active ? 'flex' : 'none';
-    }
-});
-mainbar.addControl(modelToggle);
-
 // An overlay that stay on top
 let debugLayer = new TileLayer({
     title: "Debug Tiles",
@@ -806,36 +795,39 @@ let debugLayerToggle = new Toggle({
 });
 mainbar.addControl(debugLayerToggle);
 
-// Select control
+// Feature List control
 let featurelist = new FeatureList({
     title: 'Detections',
     collapsed: true,
 });
 map.addControl(featurelist);
 featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon', 'label', 'score')
-featurelist.on('select', function(e) {
-    select.getFeatures().clear();
-    select.getFeatures().push(e.feature);
-});
-featurelist.on('dblclick', function(e) {
-    map.getView().fit(e.feature.getGeometry().getExtent())
-    map.getView().setZoom(Math.min(map.getView().getZoom(), 20) - 1)
-});
-const select = new Select({
-    hitTolerance: 5,
-    condition: singleClick
-});
-map.addInteraction(select);
-select.on('select', function(e) {
-    const f = e.selected[0];
-    if (f) {
-        featurelist.select(f)
-    }
-});
-
+let selectFeatureList;
 layerswitcherleft.on('info', function (e) {
     if (!e.layer.get('baseLayer')) {
         featurelist.setFeatures(e.layer.getSource())
+        featurelist._menu.getElementsByTagName('p')[0].innerHTML = e.layer.get('title')
+        map.removeInteraction(selectFeatureList);
+        selectFeatureList = new Select({
+            hitTolerance: 5,
+            condition: singleClick,
+            layers: [e.layer],
+        });
+        map.addInteraction(selectFeatureList);
+        featurelist.on('select', function(e) {
+            selectFeatureList.getFeatures().clear();
+            selectFeatureList.getFeatures().push(e.feature);
+        });
+        featurelist.on('dblclick', function(e) {
+            map.getView().fit(e.feature.getGeometry().getExtent())
+            map.getView().setZoom(Math.min(map.getView().getZoom(), 20) - 1)
+        });
+        selectFeatureList.on('select', function(e) {
+            const f = e.selected[0];
+            if (f) {
+                featurelist.select(f)
+            }
+        });
     }
 });
 
@@ -940,8 +932,47 @@ search.on('select', function (e) {
 var nestedbar = new Bar ({ toggleOne: true, group: true });
 mainbar.addControl(nestedbar);
 
+// Add a button to toggle the model menu.
+let predictBoxLayer = new VectorLayer({
+    name: 'Predict Box',
+    visible: false,
+    source: new VectorSource(),
+    style: new Style({
+        stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
+    }),
+});
+map.addLayer(predictBoxLayer);
+let predictBoxToggle = new Toggle({
+    title: "Model",
+    className: "model-button",
+    html: '<i class="fa-solid fa-hexagon-nodes"></i>',
+    disabled: false,
+});
+nestedbar.addControl(predictBoxToggle);
+let predictBoxInteraction = new DrawRegular({
+    source: predictBoxLayer.getSource(),
+    sides: 4,
+    canRotate: false
+});
+map.addInteraction(predictBoxInteraction);
+predictBoxInteraction.setActive(predictBoxToggle.getActive());
+predictBoxInteraction.on('drawend', function (e) {
+    let predictBox = e.feature.getGeometry().getExtent();
+    predictBoxList.push(predictBox);
+    if (predictBoxToggle.getActive()) {
+        runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+    }
+    map.getTargetElement().style.cursor = '';
+});
+predictBoxToggle.on('change:active', function (e) {
+    predictBoxLayer.getSource().clear();
+    predictBoxInteraction.setActive(e.active);
+    predictBoxLayer.setVisible(e.active);
+    if (!e.active) predictBoxList = []; // reset the bbox list if we turn off the toggle
+    $('#modelInfoElement')[0].style.display = e.active ? 'flex' : 'none';
+});
+
 // Add a toggle for drawing bounding boxes
-const bboxDisplayElement = document.getElementById('formatted');
 let bboxLayer = new VectorLayer({
     name: 'BBox',
     visible: false,
@@ -955,15 +986,7 @@ let bboxToggle = new Toggle({
     title: "Bounding Box",
     className: "bbox-toggle",
     html: '<i class="fa-solid fa-vector-square"></i>',
-    interaction: new Select(),
     active: false,
-});
-bboxToggle.on('change:active', function (e) {
-    document.getElementById('bbox').value = ''
-    bboxLayer.getSource().clear();
-    bboxInteraction.setActive(e.active);
-    bboxLayer.setVisible(e.active);
-    bboxDisplayElement.style.display = e.active ? '' : 'none';
 });
 nestedbar.addControl(bboxToggle);
 let bboxInteraction = new DrawRegular({
@@ -971,8 +994,8 @@ let bboxInteraction = new DrawRegular({
     sides: 4,
     canRotate: false
 });
-bboxInteraction.setActive(bboxToggle.getActive());
 map.addInteraction(bboxInteraction);
+bboxInteraction.setActive(bboxToggle.getActive());
 bboxInteraction.on('drawing', function (e) {
     let c0, c1, lon0, lat0, lon1, lat1, ll0, ll1
     c0 = transform(e.startCoordinate, 'EPSG:3857', 'EPSG:4326');
@@ -983,14 +1006,20 @@ bboxInteraction.on('drawing', function (e) {
     lat1 = Math.max(c0[1], c1[1]);
     ll0 = createStringXY(6)([lon0, lat0])
     ll1 = createStringXY(6)([lon1, lat1])
-    document.getElementById('bbox').value = ll0 + ', ' + ll1;
+    $('#bbox').val(ll0 + ', ' + ll1);
+});
+bboxToggle.on('change:active', function (e) {
+    $('#bbox').val('')
+    bboxLayer.getSource().clear();
+    bboxInteraction.setActive(e.active);
+    bboxLayer.setVisible(e.active);
+    $('#formatted')[0].style.display = e.active ? '' : 'none';
 });
 
 // Add a toggle for measureing length and areas.
 const typeSelect = document.getElementById('type');
 const showSegments = document.getElementById('segments');
 const clearPrevious = document.getElementById('clear');
-const measureElement = document.getElementById('measure');
 const measureSource = new VectorSource();
 const measureModify = new Modify({ source: measureSource, style: modifyStyle });
 let tipPoint;
@@ -1063,7 +1092,7 @@ measureToggle.on('change:active', function (e) {
     typeSelect.disabled = !e.active;
     showSegments.disabled = !e.active;
     clearPrevious.disabled = !e.active;
-    measureElement.style.display = e.active ? '' : 'none';
+    $('#measure')[0].style.display = e.active ? '' : 'none';
 });
 nestedbar.addControl(measureToggle);
 map.addInteraction(measureModify);
@@ -1288,7 +1317,27 @@ function runModelOnTiles() {
     const tiles = get_tiles_from_extent(predictionWindow);
     tfjs_worker.postMessage({ tiles: tiles });
 }
-
+async function get_tiles_from_cord_box(box) {
+    let z = 19;
+    let [x0, y0] = meter2tile2(box[0], box[1], z);
+    let [x1, y1] = meter2tile2(box[2], box[3], z);
+    // Collect all tiles within the bounding box
+    let tiles = [];
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+            const loadImage = swipe.leftBaseLayer.getSource().loader_(z, x, y, {crossOrigin: 'anonymous'});
+            tiles.push(
+                loadImage.then((e) => ({ x, y, z, url: e.src }))
+            );
+        }
+    }
+    return Promise.all(tiles);
+}
+async function runModelOnBoxes() {
+    let tileArrays = await Promise.all(predictBoxList.map(get_tiles_from_cord_box));
+    tfjs_worker.postMessage({ tiles: tileArrays.flat() });
+    predictBoxList = [];
+}
 
 // remove all overlays
 function toggleUI() {
@@ -1323,6 +1372,8 @@ document.addEventListener('keydown', function (event) {
         bboxElement.click();
     } else if (event.key === 'l') {
         modelInfoElement.style.display = modelInfoElement.style.display === 'flex' ? 'none' : 'flex';
+    } else if (event.key === 'c') { // clear the detection layer predictions
+        activePredictionLayer.getSource().clear();
     } else if (event.key === 'h') { // hide everything but the map
         toggleUI()
     }
