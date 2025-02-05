@@ -1214,12 +1214,31 @@ async function nmsPredictions(featuresInExtent, zoom) {
 
     return featureCollection
 }
+async function nmsPredictions1(featuresInExtent) {
+    let bounds = [];
+    let scores = [];
+    featuresInExtent.forEach((feature) => {
+        bounds.push(feature.get('bounds'));
+        scores.push(feature.get('score'));
+    });
+    const boundsTensor = tf.tensor2d(bounds, [bounds.length, 4]); // [x, 4]
+    const scoresTensor = tf.tensor1d(scores); // [x]
+    const nms = await tf.image.nonMaxSuppressionWithScoreAsync(boundsTensor, scoresTensor, scores.length, .5, .5, .1);
+    const nms_indices = nms.selectedIndices.arraySync();
+    const featureCollection = [];
+    for (const nms_idx of nms_indices) {
+        featureCollection.push(featuresInExtent[nms_idx]);
+    }
+    boundsTensor.dispose();
+    scoresTensor.dispose();
+    return featureCollection
+}
 async function nmmWrapper(nmm_extent) {
-    const featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
     // const objectPredictions1 = convertFCstoOPs(featureCollection1, intZoom);
     // const objectPredictions2 = nmm_postprocess.call(objectPredictions1);
     // const featureCollection2 = convertOPstoFCs(objectPredictions2, intZoom);
-    const featureCollection3 = await nmsPredictions(featureCollection1, intZoom);
+    let featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
+    const featureCollection3 = await nmsPredictions1(featureCollection1);
     activePredictionLayer.getSource().removeFeatures(featureCollection1);
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
