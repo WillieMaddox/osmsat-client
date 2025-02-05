@@ -21,6 +21,7 @@ import { createStringXY, toStringHDMS } from 'ol/coordinate';
 import { GeoJSON, TopoJSON, MVT, GPX, IGC, KML, WKB } from 'ol/format';
 import { Attribution, MousePosition, ScaleLine } from 'ol/control';
 import { Select, Draw, Modify, DragAndDrop, Snap, defaults as defaultInteractions } from 'ol/interaction';
+import { createBox } from 'ol/interaction/Draw';
 import { singleClick } from 'ol/events/condition';
 
 // import VectorTileSource from 'ol/source/VectorTile';
@@ -951,10 +952,18 @@ let predictBoxToggle = new Toggle({
     disabled: false,
 });
 nestedbar.addControl(predictBoxToggle);
-let predictBoxInteraction = new DrawRegular({
+let predictBoxInteraction = new Draw({
     source: predictBoxLayer.getSource(),
-    sides: 4,
-    canRotate: false
+    type: 'Circle',
+    geometryFunction: createBox(),
+    clickTolerance: 12,
+    style: new Style({
+        fill: new Fill({color: 'rgba(255, 255, 255, 0.1)'}),
+        stroke: new Stroke({
+            color: 'rgba(0, 0, 0, 0.5)',
+            width: 2,
+        }),
+    })
 });
 map.addInteraction(predictBoxInteraction);
 predictBoxInteraction.setActive(predictBoxToggle.getActive());
@@ -998,6 +1007,7 @@ let bboxToggle = new Toggle({
 nestedbar.addControl(bboxToggle);
 let bboxInteraction = new DrawRegular({
     source: bboxLayer.getSource(),
+    clickTolerance: 12,
     sides: 4,
     canRotate: false
 });
@@ -1406,5 +1416,7 @@ document.addEventListener('keydown', function (event) {
         activePredictionLayer.getSource().clear();
     } else if (event.key === 'h') { // hide everything but the map
         toggleUI()
+    } else if (event.key === 'Escape') {
+        predictBoxInteraction.abortDrawing();
     }
 }, { passive: true });
