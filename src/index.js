@@ -817,6 +817,7 @@ let selectFeatureList;
 layerswitcherleft.on('info', function (e) {
     if (!e.layer.get('baseLayer')) {
         featurelist.setFeatures(e.layer.getSource())
+        featurelist._menu.getElementsByTagName('p')[0].innerHTML = e.layer.get('title')
         map.removeInteraction(selectFeatureList);
         selectFeatureList = new Select({
             hitTolerance: 5,
