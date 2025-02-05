@@ -1326,6 +1326,8 @@ document.addEventListener('keydown', function (event) {
         bboxElement.click();
     } else if (event.key === 'l') {
         modelInfoElement.style.display = modelInfoElement.style.display === 'flex' ? 'none' : 'flex';
+    } else if (event.key === 'c') { // clear the detection layer predictions
+        activePredictionLayer.getSource().clear();
     } else if (event.key === 'h') { // hide everything but the map
         toggleUI()
     }
