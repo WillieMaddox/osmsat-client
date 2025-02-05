@@ -960,11 +960,16 @@ map.addInteraction(predictBoxInteraction);
 predictBoxInteraction.setActive(predictBoxToggle.getActive());
 predictBoxInteraction.on('drawend', function (e) {
     let predictBox = e.feature.getGeometry().getExtent();
-    predictBoxList.push(predictBox);
-    if (predictBoxToggle.getActive()) {
-        runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+    let tiles = get_tiles_from_extent(predictBox);
+    if (tiles.length > 500 && !confirm(`Download ${tiles.flat().length} tiles?`)) {
+        predictBoxLayer.getSource().removeFeature(e.feature)
+    } else {
+        predictBoxList.push(predictBox);
+        if (predictBoxToggle.getActive()) {
+            runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+        }
+        map.getTargetElement().style.cursor = '';
     }
-    map.getTargetElement().style.cursor = '';
 });
 predictBoxToggle.on('change:active', function (e) {
     predictBoxLayer.getSource().clear();
@@ -1308,7 +1313,8 @@ tfjs_worker.onmessage = function (event) {
 };
 
 function get_tiles_from_extent(box) {
-    let z = intZoom;
+    // let z = intZoom;
+    let z = $('#modelZoom').val();
     let [x0, y0] = meter2tile2(box[0], box[1], z);
     let [x1, y1] = meter2tile2(box[2], box[3], z);
     // Collect all tiles within the view extent
