@@ -801,6 +801,7 @@ let featurelist = new FeatureList({
     collapsed: true,
 });
 map.addControl(featurelist);
+featurelist.element.getElementsByTagName('button')[0].innerHTML = '<i class="fa-solid fa-table-list"></i>'
 featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon', 'label', 'score')
 let selectFeatureList;
 layerswitcherleft.on('info', function (e) {
@@ -927,6 +928,7 @@ search.on('select', function (e) {
         });
     }
 });
+$('.ol-search > button').html('<i class="fa-solid fa-magnifying-glass"></i>');
 
 /* Nested toolbar with one control activated at once */
 var nestedbar = new Bar ({ toggleOne: true, group: true });
@@ -958,11 +960,16 @@ map.addInteraction(predictBoxInteraction);
 predictBoxInteraction.setActive(predictBoxToggle.getActive());
 predictBoxInteraction.on('drawend', function (e) {
     let predictBox = e.feature.getGeometry().getExtent();
-    predictBoxList.push(predictBox);
-    if (predictBoxToggle.getActive()) {
-        runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+    let tiles = get_tiles_from_extent(predictBox);
+    if (tiles.length > 500 && !confirm(`Download ${tiles.flat().length} tiles?`)) {
+        predictBoxLayer.getSource().removeFeature(e.feature)
+    } else {
+        predictBoxList.push(predictBox);
+        if (predictBoxToggle.getActive()) {
+            runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+        }
+        map.getTargetElement().style.cursor = '';
     }
-    map.getTargetElement().style.cursor = '';
 });
 predictBoxToggle.on('change:active', function (e) {
     predictBoxLayer.getSource().clear();
@@ -1207,12 +1214,31 @@ async function nmsPredictions(featuresInExtent, zoom) {
 
     return featureCollection
 }
+async function nmsPredictions1(featuresInExtent) {
+    let bounds = [];
+    let scores = [];
+    featuresInExtent.forEach((feature) => {
+        bounds.push(feature.get('bounds'));
+        scores.push(feature.get('score'));
+    });
+    const boundsTensor = tf.tensor2d(bounds, [bounds.length, 4]); // [x, 4]
+    const scoresTensor = tf.tensor1d(scores); // [x]
+    const nms = await tf.image.nonMaxSuppressionWithScoreAsync(boundsTensor, scoresTensor, scores.length, .5, .5, .1);
+    const nms_indices = nms.selectedIndices.arraySync();
+    const featureCollection = [];
+    for (const nms_idx of nms_indices) {
+        featureCollection.push(featuresInExtent[nms_idx]);
+    }
+    boundsTensor.dispose();
+    scoresTensor.dispose();
+    return featureCollection
+}
 async function nmmWrapper(nmm_extent) {
-    const featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
     // const objectPredictions1 = convertFCstoOPs(featureCollection1, intZoom);
     // const objectPredictions2 = nmm_postprocess.call(objectPredictions1);
     // const featureCollection2 = convertOPstoFCs(objectPredictions2, intZoom);
-    const featureCollection3 = await nmsPredictions(featureCollection1, intZoom);
+    let featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
+    const featureCollection3 = await nmsPredictions1(featureCollection1);
     activePredictionLayer.getSource().removeFeatures(featureCollection1);
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
@@ -1254,22 +1280,19 @@ function loadModelOptions(directories) {
     for (let i = 15; i <= 20; i++) {
         $modelZooms.append($(`<option value="${i}">${i}</option>`));
     }
-    tfjs_worker.postMessage({ options_loaded: true });
+    loadDefaultModel();
 }
 tfjs_worker.postMessage({ url: document.URL });
 tfjs_worker.postMessage({ loadModelDirectories: true });
 // Listen for messages from the worker
 let modelLoadingStatusElement = document.getElementById('modelLoadingStatus');
 tfjs_worker.onmessage = function (event) {
-    const { directories, options_loaded, ready, results, labels, error, nmm_extent } = event.data;
+    console.log('Main thread: Message received from worker', event.data);
+    const { directories, ready, results, labels, error, nmm_extent } = event.data;
 
     if (directories) {
         // console.log('Main thread: Directories received:', directories);
         loadModelOptions(directories)
-    }
-    if (options_loaded === true) {
-        // console.log('Worker: Received options_loaded = true');
-        loadDefaultModel();
     }
     if (ready === true) {
         predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
@@ -1306,7 +1329,8 @@ tfjs_worker.onmessage = function (event) {
 };
 
 function get_tiles_from_extent(box) {
-    let z = intZoom;
+    // let z = intZoom;
+    let z = $('#modelZoom').val();
     let [x0, y0] = meter2tile2(box[0], box[1], z);
     let [x1, y1] = meter2tile2(box[2], box[3], z);
     // Collect all tiles within the view extent

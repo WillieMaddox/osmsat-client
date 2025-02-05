@@ -151,6 +151,12 @@ html, body {
 .ol-search {
     left: 22em;
 }
+.ol-control.ol-search > button:before {
+    content: none;
+}
+.ol-control.ol-search > button:after {
+    content: none;
+}
 .ol-search ul {
     color: #333;
     font-size:0.85em;
@@ -169,6 +175,9 @@ html, body {
     height: 100px;
     margin-right: .5em;
     float: left;
+}
+.ol-control.ol-feature-list > button:before {
+    content: none;
 }
 .ol-button i {
     color: inherit;
