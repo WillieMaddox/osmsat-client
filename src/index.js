@@ -21,6 +21,7 @@ import { createStringXY, toStringHDMS } from 'ol/coordinate';
 import { GeoJSON, TopoJSON, MVT, GPX, IGC, KML, WKB } from 'ol/format';
 import { Attribution, MousePosition, ScaleLine } from 'ol/control';
 import { Select, Draw, Modify, DragAndDrop, Snap, defaults as defaultInteractions } from 'ol/interaction';
+import { createBox } from 'ol/interaction/Draw';
 import { singleClick } from 'ol/events/condition';
 
 // import VectorTileSource from 'ol/source/VectorTile';
@@ -801,6 +802,7 @@ let featurelist = new FeatureList({
     collapsed: true,
 });
 map.addControl(featurelist);
+featurelist.element.getElementsByTagName('button')[0].innerHTML = '<i class="fa-solid fa-table-list"></i>'
 featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon', 'label', 'score')
 let selectFeatureList;
 layerswitcherleft.on('info', function (e) {
@@ -927,6 +929,7 @@ search.on('select', function (e) {
         });
     }
 });
+$('.ol-search > button').html('<i class="fa-solid fa-magnifying-glass"></i>');
 
 /* Nested toolbar with one control activated at once */
 var nestedbar = new Bar ({ toggleOne: true, group: true });
@@ -949,20 +952,33 @@ let predictBoxToggle = new Toggle({
     disabled: false,
 });
 nestedbar.addControl(predictBoxToggle);
-let predictBoxInteraction = new DrawRegular({
+let predictBoxInteraction = new Draw({
     source: predictBoxLayer.getSource(),
-    sides: 4,
-    canRotate: false
+    type: 'Circle',
+    geometryFunction: createBox(),
+    clickTolerance: 12,
+    style: new Style({
+        fill: new Fill({color: 'rgba(255, 255, 255, 0.1)'}),
+        stroke: new Stroke({
+            color: 'rgba(0, 0, 0, 0.5)',
+            width: 2,
+        }),
+    })
 });
 map.addInteraction(predictBoxInteraction);
 predictBoxInteraction.setActive(predictBoxToggle.getActive());
 predictBoxInteraction.on('drawend', function (e) {
     let predictBox = e.feature.getGeometry().getExtent();
-    predictBoxList.push(predictBox);
-    if (predictBoxToggle.getActive()) {
-        runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+    let tiles = get_tiles_from_extent(predictBox);
+    if (tiles.length > 500 && !confirm(`Download ${tiles.flat().length} tiles?`)) {
+        predictBoxLayer.getSource().removeFeature(e.feature)
+    } else {
+        predictBoxList.push(predictBox);
+        if (predictBoxToggle.getActive()) {
+            runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+        }
+        map.getTargetElement().style.cursor = '';
     }
-    map.getTargetElement().style.cursor = '';
 });
 predictBoxToggle.on('change:active', function (e) {
     predictBoxLayer.getSource().clear();
@@ -991,6 +1007,7 @@ let bboxToggle = new Toggle({
 nestedbar.addControl(bboxToggle);
 let bboxInteraction = new DrawRegular({
     source: bboxLayer.getSource(),
+    clickTolerance: 12,
     sides: 4,
     canRotate: false
 });
@@ -1248,12 +1265,31 @@ async function nmsPredictions(featuresInExtent, zoom) {
 
     return featureCollection
 }
+async function nmsPredictions1(featuresInExtent) {
+    let bounds = [];
+    let scores = [];
+    featuresInExtent.forEach((feature) => {
+        bounds.push(feature.get('bounds'));
+        scores.push(feature.get('score'));
+    });
+    const boundsTensor = tf.tensor2d(bounds, [bounds.length, 4]); // [x, 4]
+    const scoresTensor = tf.tensor1d(scores); // [x]
+    const nms = await tf.image.nonMaxSuppressionWithScoreAsync(boundsTensor, scoresTensor, scores.length, .5, .5, .1);
+    const nms_indices = nms.selectedIndices.arraySync();
+    const featureCollection = [];
+    for (const nms_idx of nms_indices) {
+        featureCollection.push(featuresInExtent[nms_idx]);
+    }
+    boundsTensor.dispose();
+    scoresTensor.dispose();
+    return featureCollection
+}
 async function nmmWrapper(nmm_extent) {
-    const featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
     // const objectPredictions1 = convertFCstoOPs(featureCollection1, intZoom);
     // const objectPredictions2 = nmm_postprocess.call(objectPredictions1);
     // const featureCollection2 = convertOPstoFCs(objectPredictions2, intZoom);
-    const featureCollection3 = await nmsPredictions(featureCollection1, intZoom);
+    let featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
+    const featureCollection3 = await nmsPredictions1(featureCollection1);
     activePredictionLayer.getSource().removeFeatures(featureCollection1);
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
@@ -1280,31 +1316,34 @@ $('#modelName').on('change', (e) => {
     tfjs_worker.postMessage({ model: e.target.value });
 })
 function loadDefaultModel() {
-    const default_model = 'CivPlanes_detect_1_160k_08_half_web_model'
+    const default_model = 'CivPlanes_detect_1_08_half_160k'
+    const default_model_zoom = 19;
     $('#modelName').val(default_model).trigger('change')
+    $('#modelZoom').val(default_model_zoom).trigger('change')
 }
 function loadModelOptions(directories) {
-    const $dropdown = $('#modelName');
-    $dropdown.empty().append($('<option value="">Select a model</option>'));
+    const $modelNames = $('#modelName');
+    $modelNames.empty().append($('<option value="">Select a model</option>'));
     directories.forEach(dir => {
-        $dropdown.append($(`<option value="${dir}">${dir}</option>`));
+        $modelNames.append($(`<option value="${dir}">${dir}</option>`));
     });
-    tfjs_worker.postMessage({ options_loaded: true });
+    const $modelZooms = $('#modelZoom');
+    for (let i = 15; i <= 20; i++) {
+        $modelZooms.append($(`<option value="${i}">${i}</option>`));
+    }
+    loadDefaultModel();
 }
 tfjs_worker.postMessage({ url: document.URL });
 tfjs_worker.postMessage({ loadModelDirectories: true });
 // Listen for messages from the worker
 let modelLoadingStatusElement = document.getElementById('modelLoadingStatus');
 tfjs_worker.onmessage = function (event) {
-    const { directories, options_loaded, ready, results, labels, error, nmm_extent } = event.data;
+    console.log('Main thread: Message received from worker', event.data);
+    const { directories, ready, results, labels, error, nmm_extent } = event.data;
 
     if (directories) {
         // console.log('Main thread: Directories received:', directories);
         loadModelOptions(directories)
-    }
-    if (options_loaded === true) {
-        // console.log('Worker: Received options_loaded = true');
-        loadDefaultModel();
     }
     if (ready === true) {
         predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
@@ -1341,7 +1380,8 @@ tfjs_worker.onmessage = function (event) {
 };
 
 function get_tiles_from_extent(box) {
-    let z = intZoom;
+    // let z = intZoom;
+    let z = $('#modelZoom').val();
     let [x0, y0] = meter2tile2(box[0], box[1], z);
     let [x1, y1] = meter2tile2(box[2], box[3], z);
     // Collect all tiles within the view extent
@@ -1359,7 +1399,7 @@ function runModelOnTiles() {
     tfjs_worker.postMessage({ tiles: tiles });
 }
 async function get_tiles_from_cord_box(box) {
-    let z = 19;
+    let z = $('#modelZoom').val();
     let [x0, y0] = meter2tile2(box[0], box[1], z);
     let [x1, y1] = meter2tile2(box[2], box[3], z);
     // Collect all tiles within the bounding box
@@ -1417,5 +1457,7 @@ document.addEventListener('keydown', function (event) {
         activePredictionLayer.getSource().clear();
     } else if (event.key === 'h') { // hide everything but the map
         toggleUI()
+    } else if (event.key === 'Escape') {
+        predictBoxInteraction.abortDrawing();
     }
 }, { passive: true });

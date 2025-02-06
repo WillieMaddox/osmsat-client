@@ -13,6 +13,7 @@ const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.25;
 
 async function loadModel(model_name) {
+    if (model) model.dispose();
     // load model metadata
     let t0 = performance.now();
     console.log(`LOADING MODEL ${model_name}`);
@@ -38,6 +39,7 @@ async function loadModel(model_name) {
     dummyInput.dispose();
     warmupResults.dispose();
     console.log(`  model loaded in ${(performance.now() - t0) / 1000} seconds`);
+    console.log('numTensors (loadModel): ' + tf.memory().numTensors);
 }
 async function fetchImage(url) {
     const response = await fetch(url);
@@ -183,6 +185,7 @@ async function processTiles(tiles) {
 }
 
 self.onmessage = async function (event) {
+    console.log('Worker: Received message', event.data);
     if (event.data.tiles) {
         const t0 = performance.now();
         const tiles = Object.values(event.data.tiles);
@@ -201,10 +204,6 @@ self.onmessage = async function (event) {
         const response = await fetch("models.json"); // Fetch generated JSON file
         const directories = await response.json();
         self.postMessage({ directories: directories });
-    }
-    if (event.data.options_loaded) {
-        // console.log('Worker: Received options_loaded = true');
-        self.postMessage({ options_loaded: true });
     }
     if (event.data.url) {
         const url = event.data.url;
@@ -281,6 +280,7 @@ export const detect = async (images) => {
     bounds_tensor.dispose();
     scores_tensor.dispose();
     classes_tensor.dispose();
+    console.log('numTensors (detect): ' + tf.memory().numTensors);
     return [boxes_list, bounds_list, scores_list, classes_list];
 };
 
@@ -352,6 +352,7 @@ export const detectOBB = async (images) => {
     bounds_tensor.dispose();
     scores_tensor.dispose();
     classes_tensor.dispose();
+    console.log('numTensors (obb): ' + tf.memory().numTensors);
     return [boxes_list, bounds_list, scores_list, classes_list];
 };
 
@@ -455,6 +456,7 @@ export const pose = async (images) => {
     bounds_tensor.dispose();
     bounds_scores_tensor.dispose();
     classes_tensor.dispose();
+    console.log('numTensors (poly): ' + tf.memory().numTensors);
     return [keypoints_list, bounds_list, scores_list, classes_list];
 };
 
