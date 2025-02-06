@@ -1173,7 +1173,7 @@ showSegments.onchange = function () {
 
 // Modal functionality of opening/closing jobs modal
 var modal = document.getElementById("JobModal");
-var span = document.getElementsByClassName("close-modal")[0];
+var close_modal = document.getElementsByClassName("close-modal")[0];
 let JobToggle = new Button({
     title: "Jobs",
     className: "job-toggle",
@@ -1188,7 +1188,7 @@ let JobToggle = new Button({
         }
     }
 });
-span.onclick = function() {
+close_modal.onclick = function() {
     modal.style.display = "none";
   }
   window.onclick = function(event) {
@@ -1199,11 +1199,22 @@ span.onclick = function() {
 nestedbar.addControl(JobToggle);
 
 // information buttton
-const howToUse = document.getElementById('HowToUse');
 const infoPanel = document.getElementById('infoPanel');
-howToUse.onclick = function() {
-    infoPanel.style.display = infoPanel.style.display === "block" ? "none" : "block";
-}
+const closeInfo = document.getElementById('close-info');
+let infoToggle = new Toggle({
+    title: 'Info',
+    className: 'info-toggle',
+    html: '<i class="fa-solid fa-question"></i>',
+    active: false,
+});
+nestedbar.addControl(infoToggle);
+infoToggle.on('change:active', function (e) {
+    infoPanel.style.display = e.active ? 'block' : 'none';
+});
+closeInfo.onclick = function () {
+    infoToggle.setActive(false);
+};
+
 
 // job modal map
 const mapModal = new Map({
@@ -1216,7 +1227,47 @@ const mapModal = new Map({
     view: new View({
         center: [0, 0], // Default center (longitude, latitude in EPSG:3857)
         zoom: 2 // Default zoom level
-    })
+    }),
+    interactions: defaultInteractions(),
+});
+
+//job modal map functionallity
+const dragAndDropInteractionModal = new DragAndDrop({
+    formatConstructors: [
+        GPX,
+        GeoJSON,
+        IGC,
+        new KML({
+            // extractStyles: false,
+            showPointNames: false
+        }),
+        TopoJSON,
+        WKB
+    ],
+});
+mapModal.addInteraction(dragAndDropInteractionModal);
+
+dragAndDropInteractionModal.on('addfeatures', function (e) {
+    const vectorSource = new VectorSource({
+        features: e.features,
+    });
+    const color = randomColor(); // reuse existing randomColor
+    const style = new Style({
+        image: new CircleStyle({
+            radius: 3,
+            stroke: new Stroke({ color: color, width: 2 }),
+        }),
+        stroke: new Stroke({ color: color, width: 3 }),
+    });
+    function DragAndDropVectorLayer() {
+        return new VectorLayer({
+            source: vectorSource,
+            style: style,
+        });
+    }
+    let vectorLayer = new DragAndDropVectorLayer();
+    mapModal.addLayer(vectorLayer);
+    mapModal.getView().fit(vectorSource.getExtent());
 });
 
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
@@ -1494,6 +1545,11 @@ function toggleUI() {
     document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display = document.getElementsByClassName('ol-overlaycontainer-stopevent')[0].style.display === 'none' ? '' : 'none';
     document.getElementById('panel').style.display = document.getElementById('panel').style.display === 'none' ? '' : 'none';
 }
+
+// add font awesome icon on layers switchers
+document.querySelectorAll('.ol-layerswitcher').forEach((e) => {
+    e.querySelector('button').innerHTML = '<i class="fa-solid fa-layer-group"></i>';
+});
 
 // create some button click when a key is pressed, G clicks debugLayer.setVisible(active)
 document.addEventListener('keydown', function (event) {

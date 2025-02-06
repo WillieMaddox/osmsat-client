@@ -215,10 +215,8 @@ html, body {
 .modal {
     display: none;
     position: fixed;
-    top: 7.5vh; 
     z-index: 1050;
     left: 0;
-    top: 0;
     width: 100%;
     height: 100%;
     overflow: auto;
@@ -278,7 +276,7 @@ html, body {
     border-bottom-right-radius: 6px;
 }
 #map-modal {
-    height: 25vh;
+    height: 40vh;
     padding: 10px 0;
 }
 
@@ -288,29 +286,6 @@ html, body {
     to { top: 0; opacity: 1; }
 }
 
-#HowToUse {
-    position: absolute;
-    top: 0.5rem;
-    right: 1rem;
-    font-family: "Arial";
-    font-size: 12pt;
-    z-index: 30;
-    background-color: var(--ol-background-color);
-    border-radius: 2px;
-    margin: 2px 1px;
-    width: 2em;
-    height: 2em;
-    line-height: .4em;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-    border-radius: 5px;
-}
-
-#HowToUse:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-}
 
 .close-info {
     color: #000;
@@ -344,4 +319,14 @@ html, body {
     align-items: center;
     font-size: 10pt;
     z-index: 100;
+}
+
+.ol-layerswitcher-image>button:before,
+.ol-layerswitcher>button:before {
+    height: 0;
+}
+
+.ol-layerswitcher-image>button:before,
+.ol-layerswitcher>button:after {
+    height: 0;
 }
