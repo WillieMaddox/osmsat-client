@@ -287,3 +287,61 @@ html, body {
     from { top: -50px; opacity: 0; }
     to { top: 0; opacity: 1; }
 }
+
+#HowToUse {
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    font-family: "Arial";
+    font-size: 12pt;
+    z-index: 30;
+    background-color: var(--ol-background-color);
+    border-radius: 2px;
+    margin: 2px 1px;
+    width: 2em;
+    height: 2em;
+    line-height: .4em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    border-radius: 5px;
+}
+
+#HowToUse:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.close-info {
+    color: #000;
+    float: right;
+    margin-right: 10px;
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+}
+
+.close-info:hover {
+    color: #a0a0a0;
+    text-decoration: none;
+}
+
+#infoPanel {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    height: auto;
+    min-width: 55vw;
+    max-width: 75vw;
+    transform: translate(-50%, -50%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 10pt;
+    z-index: 100;
+}

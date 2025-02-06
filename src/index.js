@@ -1159,7 +1159,7 @@ showSegments.onchange = function () {
 
 // Modal functionality of opening/closing jobs modal
 var modal = document.getElementById("JobModal");
-var span = document.getElementsByClassName("close")[0];
+var span = document.getElementsByClassName("close-modal")[0];
 let JobToggle = new Button({
     title: "Jobs",
     className: "job-toggle",
@@ -1183,6 +1183,13 @@ span.onclick = function() {
     }
   }
 nestedbar.addControl(JobToggle);
+
+// information buttton
+const howToUse = document.getElementById('HowToUse');
+const infoPanel = document.getElementById('infoPanel');
+howToUse.onclick = function() {
+    infoPanel.style.display = infoPanel.style.display === "block" ? "none" : "block";
+}
 
 // job modal map
 const mapModal = new Map({

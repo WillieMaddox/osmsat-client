@@ -47,7 +47,7 @@
             <div style="font-size: 24px;">Large Inference Manager</div>
             <p id="modal-description">...</p>
           </div>
-          <span class="close"><i class="fa-solid fa-times"></i></span>
+          <span class="close-modal"><i class="fa-solid fa-times"></i></span>
         </div>
         <div class="modal-body">
           <div class="map-container">
@@ -93,7 +93,58 @@
         <input type="checkbox" id="clear" checked disabled/>
       </div>
     </div>
-<!--      <div style="background:white; padding:0 0.45em;"><span id="info"></span>&nbsp;</div>-->
+    <div id="HowToUse">
+      <i id="HowToIcon" class="fa-solid fa-circle-info fa-lg"></i>
+      <div id="infoPanel" style="display: none; line-height: 1.25em;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 24px; font-weight: bold;">OSMSAT Tool</div>
+            <span class="close-info"><i class="fa-solid fa-times"></i></span>
+          </div>
+          <p style="color: #999; line-height: 1em;">Version 0.2</p>
+          <p>This tool allows you to perform various actions on the map:</p>
+  
+          <p><strong>Layers:</strong></p>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+              <i class="fa-solid fa-layer-group fa-lg" style="margin-right: 0.5em; padding-left:2em;"></i>
+              <strong>Base Layers:</strong> &nbsp; Choose between base layers like OpenStreetMap, Google Maps, and Bing Maps.
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+              <i class="fa-solid fa-vector-square fa-lg" style="margin-right: 0.5em; padding-left:2em;"></i>
+              <strong>Vector Layers:</strong> &nbsp; View various overlays on the map like detections or markers.
+          </div>
+  
+          <p><strong>Interactions:</strong></p>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+              <i class="fa-solid fa-border-all fa-lg" style="margin-right: 0.5em; padding-left:2em;"></i>
+              <strong>Toggle Tile Grid:</strong> &nbsp; Show or hide the tile grid on the map.
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+              <i class="fa-solid fa-draw-polygon fa-lg" style="margin-right: 0.5em; padding-left:2em;"></i>
+              <strong>Draw Box:</strong> &nbsp; Get world coordinates of a drawn bounding box.
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
+              <i class="fa-solid fa-ruler-combined fa-lg" style="margin-right: 0.5em; padding-left:2em;"></i>
+              <strong>Measure Distances:</strong> &nbsp; Measure cumulative map distance between various points.
+          </div>
+
+          <p><strong>Keyboard shortcuts:</strong></p>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+            <strong>d</strong>: Toggles the visibility of the grid tiles.
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+            <strong>p</strong>: Toggles the object detection prediction mode.
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+            <strong>m</strong>: Toggles the measurement mode.
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+            <strong>b</strong>: Toggles the bounding box drawing mode.
+          </div>
+          <div style="display: flex; align-items: center; margin-bottom: 0.5em; margin-right: 0.5em; padding-left:2em;">
+            <strong>h</strong>: Hides or shows all controls and overlays, including the "How To Use" panel.
+          </div>
+      </div>
+    </div>  
     </div>
     <script>
       document.onreadystatechange = function () {
