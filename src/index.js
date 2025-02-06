@@ -1196,7 +1196,7 @@ close_modal.onclick = function() {
       modal.style.display = "none";
     }
   }
-nestedbar.addControl(JobToggle);
+mainbar.addControl(JobToggle);
 
 // information buttton
 const infoPanel = document.getElementById('infoPanel');
@@ -1207,7 +1207,7 @@ let infoToggle = new Toggle({
     html: '<i class="fa-solid fa-question"></i>',
     active: false,
 });
-nestedbar.addControl(infoToggle);
+mainbar.addControl(infoToggle);
 infoToggle.on('change:active', function (e) {
     infoPanel.style.display = e.active ? 'block' : 'none';
 });
