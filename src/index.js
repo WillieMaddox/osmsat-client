@@ -1140,6 +1140,47 @@ showSegments.onchange = function () {
     measureDraw.getOverlay().changed();
 };
 
+// Modal functionality of opening/closing jobs modal
+var modal = document.getElementById("JobModal");
+var span = document.getElementsByClassName("close")[0];
+let JobToggle = new Button({
+    title: "Jobs",
+    className: "job-toggle",
+    id: "job-toggle",
+    html: '<i class="fa-solid fa-calendar-days"></i>',
+    active: false,
+    handleClick: function (active) {
+        if (active) {
+            modal.style.display = "block";
+        } else {
+            modal.style.display = "none";
+        }
+    }
+});
+span.onclick = function() {
+    modal.style.display = "none";
+  }
+  window.onclick = function(event) {
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+nestedbar.addControl(JobToggle);
+
+// job modal map
+const mapModal = new Map({
+    target: 'map-modal', // Target the div with id "map"
+    layers: [
+        new TileLayer({
+            source: new OSM() // OpenStreetMap as the base layer
+        })
+    ],
+    view: new View({
+        center: [0, 0], // Default center (longitude, latitude in EPSG:3857)
+        zoom: 2 // Default zoom level
+    })
+});
+
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
 async function nmsPredictions(featuresInExtent, zoom) {
     // create boxes, scores, and classes from feature values

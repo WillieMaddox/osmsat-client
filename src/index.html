@@ -40,6 +40,28 @@
   </head>
   <body>
     <div id="loader" class="center"></div>
+    <div id="JobModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 24px;">Large Inference Manager</div>
+            <p id="modal-description">...</p>
+          </div>
+          <span class="close"><i class="fa-solid fa-times"></i></span>
+        </div>
+        <div class="modal-body">
+          <div class="map-container">
+            <div id="map-modal"></div>
+          </div>
+          <button class="upload-btn">Upload KML</button>
+          <button class="select-btn">Select Model</button>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn">Cancel</button>
+          <button class="run-btn">Run</button>
+        </div>
+      </div>
+    </div>
     <div id="map">
     <div id="panel" class="ol-attribution">
       <div id="formatted" style="display:none">
