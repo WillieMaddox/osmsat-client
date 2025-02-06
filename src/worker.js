@@ -156,6 +156,19 @@ function getViewExtent(tiles) {
     const [mx1, my0] = imageCoord2Meters(0, 0, x_tile1 + 1, y_tile1 + 1, zoom);
     return [mx0, my0, mx1, my1];
 }
+function getBoundedExtent(tiles) {
+    const xs = tiles.map(p => p.x);
+    const ys = tiles.map(p => p.y);
+    const zs = tiles.map(p => p.z);
+    const x_tile0 = Math.min(...xs);
+    const y_tile0 = Math.min(...ys);
+    const x_tile1 = Math.max(...xs);
+    const y_tile1 = Math.max(...ys);
+    const zoom = Math.max(...zs);
+    const [mx0, my1] = imageCoord2Meters(0, 0, x_tile0, y_tile0, zoom);
+    const [mx1, my0] = imageCoord2Meters(0, 0, x_tile1 + 1, y_tile1 + 1, zoom);
+    return [mx0, my0, mx1, my1];
+}
 async function processTiles(tiles) {
     let t0;
     const [combos, chunks] = await preprocessTiles(tiles);
@@ -189,10 +202,10 @@ self.onmessage = async function (event) {
     if (event.data.tiles) {
         const t0 = performance.now();
         const tiles = Object.values(event.data.tiles);
-        const viewExtent = getViewExtent(tiles);
+        const boundedExtent = getBoundedExtent(tiles);
         await processTiles(tiles);
         // postprocess all results (NMM, NMS, etc.)
-        self.postMessage({ nmm_extent: viewExtent });
+        self.postMessage({ nmm_extent: boundedExtent });
         console.log('Detection finished in :', (performance.now() - t0) / 1000, 'seconds');
     }
     if (event.data.model) {

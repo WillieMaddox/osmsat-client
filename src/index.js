@@ -47,8 +47,8 @@ import LayerSwitcher from 'ol-ext/control/LayerSwitcher';
 import SearchNominatim from 'ol-ext/control/SearchNominatim';
 
 import * as tf from '@tensorflow/tfjs';
-import {toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4, getCorners, WorldPixels2Meters} from './utils';
-import {NMMPostprocess, convertOPstoFCs, convertFCstoOPs} from './postprocess';
+import { toInt, mod, randomColor, meter2pixel, meter2tile2, meter2tile4, WorldPixels2Meters, imageCoord2Meters } from './utils';
+import { NMMPostprocess, convertOPstoFCs, convertFCstoOPs } from './postprocess';
 
 const style = new Style({
     fill: new Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
@@ -208,7 +208,7 @@ const formatArea = function (polygon) {
 };
 
 let zoom = 16, center = [-110.848, 32.163];
-let predictBoxList = [];
+let predictList = [];
 
 let thunderforestAttributions = [
     'Tiles &copy; <a href="https://www.thunderforest.com/">Thunderforest</a>',
@@ -935,8 +935,8 @@ $('.ol-search > button').html('<i class="fa-solid fa-magnifying-glass"></i>');
 var nestedbar = new Bar ({ toggleOne: true, group: true });
 mainbar.addControl(nestedbar);
 
-// Add a button to toggle the model menu.
-let predictBoxLayer = new VectorLayer({
+// Add a button to toggle the model/prediction menu.
+let predictLayer = new VectorLayer({
     name: 'Predict Box',
     visible: false,
     source: new VectorSource(),
@@ -944,47 +944,61 @@ let predictBoxLayer = new VectorLayer({
         stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
     }),
 });
-map.addLayer(predictBoxLayer);
-let predictBoxToggle = new Toggle({
+map.addLayer(predictLayer);
+let predictToggle = new Toggle({
     title: "Model",
     className: "model-button",
     html: '<i class="fa-solid fa-hexagon-nodes"></i>',
     disabled: false,
 });
-nestedbar.addControl(predictBoxToggle);
-let predictBoxInteraction = new Draw({
-    source: predictBoxLayer.getSource(),
-    type: 'Circle',
-    geometryFunction: createBox(),
-    clickTolerance: 12,
-    style: new Style({
-        fill: new Fill({color: 'rgba(255, 255, 255, 0.1)'}),
-        stroke: new Stroke({
-            color: 'rgba(0, 0, 0, 0.5)',
-            width: 2,
-        }),
-    })
-});
-map.addInteraction(predictBoxInteraction);
-predictBoxInteraction.setActive(predictBoxToggle.getActive());
-predictBoxInteraction.on('drawend', function (e) {
-    let predictBox = e.feature.getGeometry().getExtent();
-    let tiles = get_tiles_from_extent(predictBox);
-    if (tiles.length > 500 && !confirm(`Download ${tiles.flat().length} tiles?`)) {
-        predictBoxLayer.getSource().removeFeature(e.feature)
-    } else {
-        predictBoxList.push(predictBox);
-        if (predictBoxToggle.getActive()) {
-            runModelOnBoxes(); //  if predict is active run on boxes as they are drawn
+nestedbar.addControl(predictToggle);
+let predictInteraction; // global so we can remove it later
+function addPredictInteraction(value) {
+    if (value !== 'None') {
+        let geometryFunction;
+        let clickTolerance;
+        if (value === 'Rectangle') {
+            value = 'Circle';
+            geometryFunction = createBox();
+            clickTolerance = 12;
+        } else if (value === 'Polygon') {
+            value = 'Polygon';
+            clickTolerance = 12;
         }
-        map.getTargetElement().style.cursor = '';
+        predictInteraction = new Draw({
+            source: predictLayer.getSource(),
+            type: value,
+            geometryFunction: geometryFunction,
+            clickTolerance: clickTolerance,
+            style: new Style({
+                fill: new Fill({color: 'rgba(255, 255, 255, 0.1)'}),
+                stroke: new Stroke({color: 'rgba(0, 0, 0, 0.5)', width: 2}),
+            })
+        });
+        map.addInteraction(predictInteraction);
+        predictInteraction.setActive(predictToggle.getActive());
+        predictInteraction.on('drawend', function (e) {
+            let predictPolygon = e.feature.getGeometry();
+            let tiles = get_tiles_from_polygon(predictPolygon);
+            if (tiles.length > 500 && !confirm(`Download ${tiles.flat().length} tiles?`)) {
+                predictLayer.getSource().once('addfeature', function (event) {
+                    predictLayer.getSource().removeFeature(event.feature)
+                })
+            } else {
+                predictList.push(tiles);
+                if (predictToggle.getActive()) {
+                    runModelOnCoords(); //  if predict is active run on boxes as they are drawn
+                }
+                map.getTargetElement().style.cursor = '';
+            }
+        });
     }
-});
-predictBoxToggle.on('change:active', function (e) {
-    predictBoxLayer.getSource().clear();
-    predictBoxInteraction.setActive(e.active);
-    predictBoxLayer.setVisible(e.active);
-    if (!e.active) predictBoxList = []; // reset the bbox list if we turn off the toggle
+}
+predictToggle.on('change:active', function (e) {
+    predictLayer.getSource().clear();
+    predictInteraction.setActive(e.active);
+    predictLayer.setVisible(e.active);
+    if (!e.active) predictList = []; // reset the bbox list if we turn off the toggle
     $('#modelInfoElement')[0].style.display = e.active ? 'flex' : 'none';
 });
 
@@ -1322,11 +1336,17 @@ document.addEventListener('DOMContentLoaded', function () {
 $('#modelName').on('change', (e) => {
     tfjs_worker.postMessage({ model: e.target.value });
 })
+$('#predictDrawType').on('change', (e) => {
+    map.removeInteraction(predictInteraction);
+    addPredictInteraction(e.target.value)
+
+})
 function loadDefaultModel() {
     const default_model = 'CivPlanes_detect_1_08_half_160k'
     const default_model_zoom = 19;
     $('#modelName').val(default_model).trigger('change')
     $('#modelZoom').val(default_model_zoom).trigger('change')
+    $('#predictDrawType').val('Rectangle').trigger('change')
 }
 function loadModelOptions(directories) {
     const $modelNames = $('#modelName');
@@ -1422,9 +1442,46 @@ async function get_tiles_from_cord_box(box) {
     return Promise.all(tiles);
 }
 async function runModelOnBoxes() {
-    let tileArrays = await Promise.all(predictBoxList.map(get_tiles_from_cord_box));
+    let tileArrays = await Promise.all(predictList.map(get_tiles_from_cord_box));
     tfjs_worker.postMessage({ tiles: tileArrays.flat() });
-    predictBoxList = [];
+    predictList = [];
+}
+function get_tiles_from_polygon(polygon) {
+    // let z = intZoom;
+    let z = toInt($('#modelZoom').val());
+    const tile_coords = polygon.getCoordinates()[0].map(([x, y]) => meter2tile2(x, y, z));
+    const geom = new Polygon([tile_coords]);
+    const [x0, y0, x1, y1] = geom.getExtent();
+
+    // Collect all tiles within the bounded polygon
+    let tiles = [];
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+            for (let i = 0; i < 4; i++) {
+                let [mx, my] = imageCoord2Meters(0, 0, x + mod(i, 2), y + Math.floor(i / 2), z);
+                if (polygon.containsXY(mx, my)) {
+                    tiles.push({x, y, z});
+                    break;
+                }
+            }
+        }
+    }
+    return tiles;
+}
+async function get_tiles_from_coord_list(coord_list) {
+    let tiles = [];
+    coord_list.forEach(({ x, y, z }) => {
+        const loadImage = swipe.leftBaseLayer.getSource().loader_(z, x, y, {crossOrigin: 'anonymous'});
+        tiles.push(
+            loadImage.then((e) => ({ x, y, z, url: e.src }))
+        );
+    });
+    return Promise.all(tiles);
+}
+async function runModelOnCoords() {
+    let tileArrays = await Promise.all(predictList.map(get_tiles_from_coord_list));
+    tfjs_worker.postMessage({ tiles: tileArrays.flat() });
+    predictList = [];
 }
 
 // remove all overlays
@@ -1465,6 +1522,6 @@ document.addEventListener('keydown', function (event) {
     } else if (event.key === 'h') { // hide everything but the map
         toggleUI()
     } else if (event.key === 'Escape') {
-        predictBoxInteraction.abortDrawing();
+        predictInteraction.abortDrawing();
     }
 }, { passive: true });
