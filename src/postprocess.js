@@ -4,7 +4,7 @@ import { Polygon } from "ol/geom";
 import { meter2pixel, getCorners, WorldPixels2Meters } from "./utils";
 
 class BoundingBox {
-    constructor(box, shiftAmount = [0, 0]) {
+    constructor(box) {
         if (box[0] < 0 || box[1] < 0 || box[2] < 0 || box[3] < 0) {
             throw new Error("Box coords [minx, miny, maxx, maxy] cannot be negative");
         }
@@ -13,27 +13,12 @@ class BoundingBox {
         this.maxx = box[2];
         this.maxy = box[3];
 
-        this.shift_x = shiftAmount[0];
-        this.shift_y = shiftAmount[1];
-    }
-
-    get shiftAmount() {
-        return [this.shift_x, this.shift_y];
     }
 
     toVocBBox() {
         return [this.minx, this.miny, this.maxx, this.maxy];
     }
 
-    getShiftedBox() {
-        const box = [
-            this.minx + this.shift_x,
-            this.miny + this.shift_y,
-            this.maxx + this.shift_x,
-            this.maxy + this.shift_y,
-        ];
-        return new BoundingBox(box);
-    }
 }
 
 class Category {
@@ -49,50 +34,38 @@ class Category {
     }
 }
 
+class Keypoints {
+    constructor(keypoints = null) {
+        this.keypoints = keypoints;
+    }
+
+    asArray() {
+        return this.keypoints;
+    }
+
+}
+
 class ObjectAnnotation {
     constructor({
         bbox = null,
+        keypoints = null,
         category_id = null,
         category_name = null,
-        shiftAmount = [0, 0],
-        fullShape = null,
     } = {}) {
         if (typeof category_id !== 'number') {
             throw new Error(`category_id must be an integer, got type ${typeof category_id}`);
+        }
+        if (bbox === null && keypoints === null) {
+            throw new Error("you must provide a bbox or keypoints");
         }
         if (bbox === null) {
             throw new Error("you must provide a bbox");
         }
 
-        const xmin = Math.max(bbox[0], 0);
-        const ymin = Math.max(bbox[1], 0);
-        let xmax, ymax;
-        if (fullShape) {
-            xmax = Math.min(bbox[2], fullShape[1]);
-            ymax = Math.min(bbox[3], fullShape[0]);
-        } else {
-            xmax = bbox[2];
-            ymax = bbox[3];
-        }
-        const bbox2 = [xmin, ymin, xmax, ymax];
-        this.bbox = new BoundingBox(bbox2, shiftAmount);
-
+        this.bbox = new BoundingBox(bbox);
+        this.keypoints = new Keypoints(keypoints);
         this.category = new Category(category_id, category_name || String(category_id));
         this.merged = null;
-    }
-
-    deepcopy() {
-        return JSON.parse(JSON.stringify(this));
-    }
-
-    getShiftedObjectAnnotation() {
-        return new ObjectAnnotation({
-            bbox: this.bbox.getShiftedBox().toVocBBox(),
-            category_id: this.category.id,
-            category_name: this.category.name,
-            shiftAmount: [0, 0],
-            fullShape: null,
-        });
     }
 }
 
@@ -110,23 +83,11 @@ class ObjectPrediction extends ObjectAnnotation {
         bbox = null,
         category_id = null,
         category_name = null,
+        keypoints = null,
         score = 0,
-        shiftAmount = [0, 0],
-        fullShape = null,
     } = {}) {
-        super({ bbox, category_id, category_name, shiftAmount, fullShape });
+        super({ bbox, category_id, category_name, keypoints });
         this.score = new PredictionScore(score);
-    }
-
-    getShiftedObjectPrediction() {
-        return new ObjectPrediction({
-            bbox: this.bbox.getShiftedBox().toVocBBox(),
-            category_id: this.category.id,
-            category_name: this.category.name,
-            score: this.score.value,
-            shiftAmount: [0, 0],
-            fullShape: null,
-        });
     }
 }
 
@@ -162,14 +123,6 @@ class ObjectPredictionList {
         } else {
             throw new Error(`Unsupported index type: ${typeof i}`);
         }
-    }
-
-    toString() {
-        return JSON.stringify(this.list);
-    }
-
-    extend(objectPredictionList) {
-        this.list.push(...objectPredictionList.list);
     }
 
     toTensor() {
@@ -257,19 +210,21 @@ function getMergedCategory(pred1, pred2) {
     return pred1.score.value > pred2.score.value ? pred1.category : pred2.category;
 }
 
+function getMergedKeypoints(pred1, pred2) {
+    return pred1.score.value > pred2.score.value ? pred1.keypoints : pred2.keypoints;
+}
+
 function mergeObjectPredictionPair(pred1, pred2) {
-    const shiftAmount = pred1.bbox.shiftAmount;
     const mergedBBox = getMergedBBox(pred1, pred2);
     const mergedScore = getMergedScore(pred1, pred2);
     const mergedCategory = getMergedCategory(pred1, pred2);
-    const fullShape = null;
+    const mergedKeypoints = getMergedKeypoints(pred1, pred2);
     return new ObjectPrediction({
         bbox: mergedBBox.toVocBBox(),
         score: mergedScore,
         category_id: mergedCategory.id,
         category_name: mergedCategory.name,
-        shiftAmount: shiftAmount,
-        fullShape: fullShape,
+        keypoints: mergedKeypoints.asArray(),
     });
 }
 
@@ -396,15 +351,17 @@ export class NMMPostprocess extends PostprocessPredictions {
     }
 }
 
-export function convertFCstoOPs(featureCollection, zoom) {
+export function convertFCstoOPs(featureCollection, zoom, task) {
     const objectPredictions = []
     featureCollection.forEach(feature => {
-        const [minx, miny, maxx, maxy] = feature.getGeometry().getExtent();
-        const [px0, py0] = meter2pixel(minx, maxy, zoom);
-        const [px1, py1] = meter2pixel(maxx, miny, zoom);
+        const geom = feature.getGeometry().getCoordinates();
+        const [minx, miny, maxx, maxy] = feature.get('bounds')
+        const [px0, py0] = meter2pixel(minx, miny, zoom);
+        const [px1, py1] = meter2pixel(maxx, maxy, zoom);
         const bbox = [px0, py0, px1, py1];
         const op = new ObjectPrediction({
             bbox: bbox,
+            keypoints: geom,
             category_id: feature.get('classIndex'),
             category_name: feature.get('label'),
             score: feature.get('score'),
@@ -413,14 +370,26 @@ export function convertFCstoOPs(featureCollection, zoom) {
     });
     return objectPredictions;
 }
-export function convertOPstoFCs(objectPredictions, zoom) {
+export function convertOPstoFCs(objectPredictions, zoom, task) {
     const featureCollection = []
     objectPredictions.forEach(op => {
-        const worldPixels = getCorners(op.bbox.toVocBBox());
-        const meters = worldPixels.map(([x, y]) => WorldPixels2Meters(x, y, zoom));
-        meters.push(meters[0]);
+        let geom, geometry;
+        const [px0, py0, px1, py1] = op.bbox.toVocBBox();
+        const [minx, miny] = WorldPixels2Meters(px0, py0, zoom);
+        const [maxx, maxy] = WorldPixels2Meters(px1, py1, zoom);
+        const bounds = [minx, miny, maxx, maxy];
+        if (task === 'pose') {
+            geom = op.keypoints.asArray();
+            geometry = new Polygon(geom);
+        } else if (task === 'detect') {
+            const worldPixels = getCorners(op.bbox.toVocBBox());
+            const meters = worldPixels.map(([x, y]) => WorldPixels2Meters(x, y, zoom));
+            meters.push(meters[0]);
+            geometry = new Polygon([meters]);
+        }
         const feature = new Feature({
-            geometry: new Polygon([meters]),
+            geometry: geometry,
+            bounds: bounds,
             classIndex: op.category.id,
             label: op.category.name,
             score: op.score.value,

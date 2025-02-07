@@ -212,6 +212,7 @@ self.onmessage = async function (event) {
         self.postMessage({ ready: false });
         await loadModel(event.data.model);
         self.postMessage({ ready: true });
+        self.postMessage({ model_loaded: task });
     }
     if (event.data.loadModelDirectories) {
         const response = await fetch("models.json"); // Fetch generated JSON file
