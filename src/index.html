@@ -2,7 +2,8 @@
 <html lang="en-US">
   <head>
     <meta charset="utf-8">
-    <title>OSMSAT viewer built on OpenLayers</title>
+    <title>OSMSAT</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <!--    <link rel="stylesheet" href="node_modules/ol/ol.css" />-->
 <!--    <link rel="stylesheet" href="node_modules/ol-ext/dist/ol-ext.css" />-->
@@ -101,11 +102,10 @@
       </div>
     </div>
     <div id="HowToUse">
-      <i id="HowToIcon" class="fa-solid fa-circle-info fa-lg"></i>
       <div id="infoPanel" style="display: none; line-height: 1.25em;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 24px; font-weight: bold;">OSMSAT Tool</div>
-            <span class="close-info"><i class="fa-solid fa-times"></i></span>
+            <span id="close-info" class="close-info"><i class="fa-solid fa-times"></i></span>
           </div>
           <p style="color: #999; line-height: 1em;">Version 0.2</p>
           <p>This tool allows you to perform various actions on the map:</p>
