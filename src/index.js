@@ -130,7 +130,7 @@ let labels = [];
 let colors = [];
 function updateLabels(newLabels) {
     labels = newLabels;
-    colors = Array.from({ length: Object.entries(labels).length }, () => randomColor(0.2));
+    colors = Array.from({ length: Object.entries(labels).length }, () => randomColor());
 }
 // Function to create text style with hardcoded settings
 const createTextStyle = function (feature, resolution) {
@@ -161,11 +161,8 @@ const polygonStyleFunction = (feature, resolution) => {
     let classIndex = feature.get('classIndex');
     let fillColor = colors[classIndex];
     return new Style({
-        stroke: new Stroke({
-            color: fillColor.slice(0, 3).concat([0.5]),
-            width: 1,
-        }),
-        fill: new Fill({ color: fillColor }),
+        stroke: new Stroke({ color: fillColor, width: 1.5 }),
+        fill: new Fill({ color: fillColor.concat([0.1]) }),
         text: createTextStyle(feature, resolution),
     });
 };
@@ -209,6 +206,7 @@ const formatArea = function (polygon) {
 
 let zoom = 16, center = [-110.848, 32.163];
 let predictList = [];
+let task;
 
 let thunderforestAttributions = [
     'Tiles &copy; <a href="https://www.thunderforest.com/">Thunderforest</a>',
@@ -803,12 +801,12 @@ let featurelist = new FeatureList({
 });
 map.addControl(featurelist);
 featurelist.element.getElementsByTagName('button')[0].innerHTML = '<i class="fa-solid fa-table-list"></i>'
-featurelist.enableSort('name1', 'name3', 'country', 'Country', 'lon', 'label', 'score')
 let selectFeatureList;
 layerswitcherleft.on('info', function (e) {
     if (!e.layer.get('baseLayer')) {
         featurelist.setFeatures(e.layer.getSource())
         featurelist._menu.getElementsByTagName('p')[0].innerHTML = e.layer.get('title')
+        featurelist.enableSort(...featurelist.getColumns(e.layer.getSource().getFeatures()))
         map.removeInteraction(selectFeatureList);
         selectFeatureList = new Select({
             hitTolerance: 5,
@@ -830,6 +828,7 @@ layerswitcherleft.on('info', function (e) {
                 featurelist.select(f)
             }
         });
+        featurelist.collapse(false);
     }
 });
 
@@ -931,11 +930,11 @@ search.on('select', function (e) {
 });
 $('.ol-search > button').html('<i class="fa-solid fa-magnifying-glass"></i>');
 
-/* Nested toolbar with one control activated at once */
+// Nested toolbar (Only one control activated at a time.)
 var nestedbar = new Bar ({ toggleOne: true, group: true });
 mainbar.addControl(nestedbar);
 
-// Add a button to toggle the model/prediction menu.
+// Add a toggle for the model/prediction menu.
 let predictLayer = new VectorLayer({
     name: 'Predict Box',
     visible: false,
@@ -1172,8 +1171,8 @@ showSegments.onchange = function () {
 };
 
 // Modal functionality of opening/closing jobs modal
-var modal = document.getElementById("JobModal");
-var close_modal = document.getElementsByClassName("close-modal")[0];
+let modal = document.getElementById("JobModal");
+let close_modal = document.getElementsByClassName("close-modal")[0];
 let JobToggle = new Button({
     title: "Jobs",
     className: "job-toggle",
@@ -1190,12 +1189,12 @@ let JobToggle = new Button({
 });
 close_modal.onclick = function() {
     modal.style.display = "none";
-  }
-  window.onclick = function(event) {
-    if (event.target == modal) {
-      modal.style.display = "none";
+};
+window.onclick = function(event) {
+    if (event.target === modal) {
+        modal.style.display = "none";
     }
-  }
+};
 mainbar.addControl(JobToggle);
 
 // information buttton
@@ -1270,7 +1269,7 @@ dragAndDropInteractionModal.on('addfeatures', function (e) {
     mapModal.getView().fit(vectorSource.getExtent());
 });
 
-const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
+const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', true);
 async function nmsPredictions(featuresInExtent, zoom) {
     // create boxes, scores, and classes from feature values
     let geoms = [];
@@ -1346,7 +1345,7 @@ async function nmsPredictions1(featuresInExtent) {
     });
     const boundsTensor = tf.tensor2d(bounds, [bounds.length, 4]); // [x, 4]
     const scoresTensor = tf.tensor1d(scores); // [x]
-    const nms = await tf.image.nonMaxSuppressionWithScoreAsync(boundsTensor, scoresTensor, scores.length, .5, .5, .1);
+    const nms = await tf.image.nonMaxSuppressionWithScoreAsync(boundsTensor, scoresTensor, scores.length, .5, .25, .1);
     const nms_indices = nms.selectedIndices.arraySync();
     const featureCollection = [];
     for (const nms_idx of nms_indices) {
@@ -1357,11 +1356,17 @@ async function nmsPredictions1(featuresInExtent) {
     return featureCollection
 }
 async function nmmWrapper(nmm_extent) {
-    // const objectPredictions1 = convertFCstoOPs(featureCollection1, intZoom);
-    // const objectPredictions2 = nmm_postprocess.call(objectPredictions1);
-    // const featureCollection2 = convertOPstoFCs(objectPredictions2, intZoom);
+    const zoom = toInt($('#modelZoom').val());
     let featureCollection1 = activePredictionLayer.getSource().getFeaturesInExtent(nmm_extent);
-    const featureCollection3 = await nmsPredictions1(featureCollection1);
+    let featureCollection2;
+    if (task !== 'obb') {
+        const objectPredictions1 = convertFCstoOPs(featureCollection1, zoom, task); //, intZoom);
+        const objectPredictions2 = nmm_postprocess.call(objectPredictions1);
+        featureCollection2 = convertOPstoFCs(objectPredictions2, zoom, task); // , intZoom);
+    } else {
+        featureCollection2 = featureCollection1;
+    }
+    const featureCollection3 = await nmsPredictions1(featureCollection2);
     activePredictionLayer.getSource().removeFeatures(featureCollection1);
     activePredictionLayer.getSource().addFeatures(featureCollection3);
 }
@@ -1417,12 +1422,9 @@ tfjs_worker.postMessage({ loadModelDirectories: true });
 let modelLoadingStatusElement = document.getElementById('modelLoadingStatus');
 tfjs_worker.onmessage = function (event) {
     console.log('Main thread: Message received from worker', event.data);
-    const { directories, ready, results, labels, error, nmm_extent } = event.data;
+    const { directories, ready, model_loaded, results, labels, error, nmm_extent } = event.data;
 
-    if (directories) {
-        // console.log('Main thread: Directories received:', directories);
-        loadModelOptions(directories)
-    }
+    if (directories) { loadModelOptions(directories) }
     if (ready === true) {
         predictButton.setHtml('<i class="fa-solid fa-bolt"></i>');
         predictButton.setDisable(false);
@@ -1434,6 +1436,9 @@ tfjs_worker.onmessage = function (event) {
         predictButton.setDisable(true);
         modelLoadingStatusElement.innerHTML = 'Loading';
         modelLoadingStatusElement.style.backgroundColor = 'rgb(255, 165, 0)';
+    }
+    if (model_loaded) {
+        task = model_loaded
     }
     // Handle the results if the model is ready
     if (results) { // results.geometry, results.bounds, results.classIndex, results.label, results.score
