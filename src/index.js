@@ -979,7 +979,7 @@ function addPredictInteraction(value) {
         predictInteraction.setActive(predictToggle.getActive());
         predictInteraction.on('drawend', function (e) {
             let predictPolygon = e.feature.getGeometry();
-            let tiles = get_tiles_from_polygon(predictPolygon);
+            let tiles = get_tiles_from_polygon(predictPolygon, toInt($('#modelZoom').val()));
             if (tiles.length > 500 && !confirm(`Download ${tiles.flat().length} tiles?`)) {
                 predictLayer.getSource().once('addfeature', function (event) {
                     predictLayer.getSource().removeFeature(event.feature)
@@ -1182,7 +1182,7 @@ let JobToggle = new Button({
     active: false,
     handleClick: function (active) {
         if (active) {
-            modal.style.display = "block";
+            modal.style.display = "grid";
         } else {
             modal.style.display = "none";
         }
@@ -1221,12 +1221,16 @@ const mapModal = new Map({
     target: 'map-modal', // Target the div with id "map"
     layers: [
         new TileLayer({
-            source: new OSM() // OpenStreetMap as the base layer
-        })
+            title: 'Google (Roads)',
+            visible: true,
+            baseLayer: true,
+            noSwitcherDelete: true,
+            source: sourceGoogleRoads,
+        }),
     ],
     view: new View({
-        center: [0, 0], // Default center (longitude, latitude in EPSG:3857)
-        zoom: 2 // Default zoom level
+        center: transform([-86.5861, 34.7304], 'EPSG:4326', 'EPSG:3857'),
+        zoom: 4 // Default zoom level
     }),
     interactions: defaultInteractions(),
 });
@@ -1246,6 +1250,69 @@ const dragAndDropInteractionModal = new DragAndDrop({
     ],
 });
 mapModal.addInteraction(dragAndDropInteractionModal);
+
+// polygon drawing on modal map
+let modalBar = new Bar();
+
+let drawModal; // global so we can remove it later
+function addModalInteraction() {
+    const source = new VectorSource();
+    const vectorLayer = new VectorLayer({
+        source: source,
+        style: new Style({
+            stroke: new Stroke({ color: 'rgb(0,76,151)', width: 3 }),
+        }),
+    });
+    mapModal.addLayer(vectorLayer);
+    drawModal = new Draw({
+        source: source,
+        type: 'Polygon',
+    });
+    mapModal.addInteraction(drawModal);
+    drawModal.on('drawend', function (e) {
+        const polygon = e.feature.getGeometry();
+        const new_tiles = get_tiles_from_polygon(polygon, jobModalDetails["Stage 1 Zoom"] || 16);
+        jobModalTiles = jobModalTiles.concat(new_tiles);
+        updateJobModalDetails({ "Tiles": jobModalTiles.flat().length });
+    });
+}
+
+// add two toggles for drawing polygons on the modal map, 1 that clears them and 1 that start the draw
+let drawToggle = new Toggle({
+    title: "Draw",
+    className: "draw-toggle",
+    html: '<i class="fa-solid fa-vector-square"></i>',
+    active: false,
+});
+modalBar.addControl(drawToggle);
+drawToggle.on('change:active', function (e) {
+    if (e.active) {
+        addModalInteraction();
+    } else {
+        mapModal.removeInteraction(drawModal);
+    }
+});
+
+
+let clearButton = new Button({
+    title: "Clear",
+    className: "clear-button",
+    html: '<i class="fa-solid fa-eraser"></i>',
+    handleClick: function () {
+        mapModal.getLayers().forEach(layer => {
+            if (layer instanceof VectorLayer) {
+                layer.getSource().clear();
+            }
+        });
+        jobModalDetails = {"Stage 1 Zoom": 16, "Tiles": 0}
+        updateJobModalDetails({ "Tiles": null });
+        updateJobModalDetails({ "Locations": null });
+        document.querySelectorAll('.S1_Model, .S2_Model').forEach(el => el.style.backgroundColor = 'Transparent');
+        document.getElementById('run-btn').style.display = 'none';
+    }
+});
+modalBar.addControl(clearButton);
+mapModal.addControl(modalBar);
 
 dragAndDropInteractionModal.on('addfeatures', function (e) {
     const vectorSource = new VectorSource({
@@ -1268,6 +1335,246 @@ dragAndDropInteractionModal.on('addfeatures', function (e) {
     let vectorLayer = new DragAndDropVectorLayer();
     mapModal.addLayer(vectorLayer);
     mapModal.getView().fit(vectorSource.getExtent());
+    parseMapLocations(vectorSource);
+});
+
+// Pin Tile Buffer in Job Modal
+document.getElementById('pinTileBuffer').addEventListener('input', function () {
+    const bufferValue = this.value;
+    document.getElementById('pinTileBufferValue').textContent = bufferValue;
+    updateJobModalDetails({ "Buffer": bufferValue });
+});
+
+// tileProvider options for the modal
+document.getElementById('tileProvider').addEventListener('change', function () {
+    const tileProvider = this.value;
+    updateJobModalDetails({ "Tile Provider": tileProvider });
+});
+
+
+// Parse map locations from vector source
+function parseMapLocations(vectorSource) {
+    const locations = vectorSource.getFeatures().map(feature => {
+        const coords = feature.getGeometry().getExtent();
+        return [coords[0], coords[1]];
+    });
+    jobModalLocations = jobModalLocations.concat(locations);
+    updateJobModalDetails({ "Locations": jobModalLocations.length });
+
+}
+
+// Update tiles to new zoom level
+function updateTilesToNewZoom(tiles, newZoom) {
+    let newTiles = tiles.map(({ x, y }) => {
+        return Tile2NewZoomTile(x, y, jobModalDetails["Stage 1 Zoom"], newZoom);
+    }).flat();
+
+    // Deduplicate using an object (faster than Set for objects)
+    const uniqueTiles = {};
+    newTiles.forEach(({ x, y, z }) => {
+        const key = `${x},${y},${z}`; // Unique key for each tile
+        uniqueTiles[key] = { x, y, z }; // Always overwrite, ensuring uniqueness
+    });
+
+    // Convert back to an array
+    jobModalTiles = Object.values(uniqueTiles);
+}
+
+
+function Tile2NewZoomTile(x, y, z, newZ) {
+    if (newZ > z) {
+        // Calculate child tiles for higher zoom levels
+        const scale = 2 ** (newZ - z);
+        const startX = x * scale;
+        const startY = y * scale;
+        const tiles = [];
+        for (let i = 0; i < scale; i++) {
+            for (let j = 0; j < scale; j++) {
+                tiles.push({ x: startX + i, y: startY + j, z: newZ });
+            }
+        }
+        return tiles;
+    } else if (newZ < z) {
+        // Calculate parent tile for lower zoom levels
+        const scale = 2 ** (z - newZ);
+        const parentX = Math.floor(x / scale);
+        const parentY = Math.floor(y / scale);
+        return [{ x: parentX, y: parentY, z: newZ }];
+    } else {
+        // Return the same tile if zoom level doesn't change
+        return [{ x, y, z }];
+    }
+}
+
+// Job modal details management
+let jobModalDetails = {"Stage 1 Zoom": 16, "Tiles": 0}
+let jobModalTiles = [];
+let jobModalLocations = [];
+
+function updateJobModalDetails(updates = {}) {
+    const buffer = document.getElementById('pinTileBufferValue').textContent;
+    const tileProvider = document.getElementById('tileProvider').value;
+    updates = { "Buffer": buffer, "Tile Provider": tileProvider, ...updates };
+
+    // Remove null values and update modal details
+    Object.keys(updates).forEach(key => {
+        if (updates[key] === null) {
+            delete jobModalDetails[key];
+            delete updates[key];
+
+        const detailElement = document.querySelector(`.${key.replace(/\s+/g, '-')}-detail`);
+        if (detailElement) detailElement.remove(); }
+    });
+
+    Object.assign(jobModalDetails, updates);
+    updateJobDetailsDisplay();
+    updateTimePrediction();
+}
+
+// Update job details in the modal
+function updateJobDetailsDisplay() {
+    const detailElement = document.getElementById('job-details');
+    detailElement.innerHTML = '';
+
+    Object.entries(jobModalDetails).forEach(([key, value]) => {
+        const p = document.createElement('p');
+        p.innerHTML = `${key}: ${value}`;
+        p.className = `${key}-detail`;
+        Object.assign(p.style, {
+            border: '1px solid #ccc',
+            padding: '5px',
+            borderRadius: '12px',
+            fontSize: '11px',
+            backgroundColor: '#f0f0f0',
+            display: 'inline-block',
+        });
+        detailElement.appendChild(p);
+    });
+}
+
+// Predict processing time
+function updateTimePrediction() {
+    const timePerTile = 0.25;
+    const tiles = jobModalDetails["Tiles"] || 0;
+    const locations = jobModalDetails["Locations"] || 0;
+    const buffer = jobModalDetails["Buffer"] || 0;
+    const timeElement = document.getElementById('job-prediction-details');
+    const runButton = document.getElementById('run-btn');
+
+    if (tiles || (locations && buffer)) {
+        const expansionFactor = buffer > 0 ? (2 * buffer + 1) ** 2 : 1;
+        const tilesFromPins = locations * expansionFactor;
+        const totalTiles = tiles + tilesFromPins;
+        const totalTime = totalTiles * timePerTile; // 0.25 seconds per tile
+
+        const hours = Math.floor(totalTime / 3600);
+        const minutes = Math.floor((totalTime % 3600) / 60);
+        const seconds = Math.floor(totalTime % 60);
+
+        timeElement.innerHTML = ` ${hours}h ${minutes}m ${seconds}s for ${totalTiles.toLocaleString()} tiles`;
+
+        if (jobModalDetails["Stage 1 Model"]) {
+            runButton.style.display = 'block';
+        }
+        
+    } else {
+        timeElement.innerHTML = '';
+        runButton.style.display = 'none';
+    }
+}
+
+// Model selection for the modal
+const ModalModels = {
+    "AllPlanes Single z17": {
+        submodels: [
+            { "model": "AllPlanes 293 HBB", "zoom": 19 },
+            { "model": "AllPlanes 293 OBB", "zoom": 19 },
+            { "model": "AllPlanes 293 Keypoint", "zoom": 19 }
+        ],
+        zoom: 17
+    },
+    "AllPlanes Single z16": {
+        submodels: [
+            { "model": "AllPlanes 293 HBB", "zoom": 19 },
+            { "model": "AllPlanes 293 OBB", "zoom": 19 },
+            { "model": "AllPlanes 293 Keypoint", "zoom": 19 }
+        ],
+        zoom: 16
+    }
+};
+
+const s1models = document.getElementById('s1models');
+const s2models = document.getElementById('s2models');
+
+// Populate models
+function populateModels(models, targetElement, className, icon, clickHandler) {
+    targetElement.innerHTML = '';
+    Object.keys(models).forEach(modelName => {
+        const listItem = createListItem(modelName, className, icon, clickHandler);
+        targetElement.appendChild(listItem);
+    });
+}
+
+// Create a list item element
+function createListItem(text, className, icon, clickHandler) {
+    const li = document.createElement('li');
+    li.className = className;
+    li.style.marginBottom = '5px';
+    li.style.cursor = 'pointer';
+    li.innerHTML = `<i class="fa-solid ${icon}" style="margin-right: 5px;"></i>${text}`;
+    li.addEventListener('click', clickHandler);
+    return li;
+}
+
+// Handle Stage 1 model selection
+function handleStage1Click(event) {
+    const selectedModelName = event.currentTarget.innerText;
+    const selectedModel = ModalModels[selectedModelName];
+
+    if (!selectedModel) return;
+
+    // update num tiles if we have already selected tiles
+    if (jobModalDetails["Tiles"] != null && selectedModel.zoom !== jobModalDetails["Stage 1 Zoom"]) {
+        let startobmodaldetails = jobModalDetails["Tiles"];
+        let startjobmodalzoom = jobModalDetails["Stage 1 Zoom"];
+        updateTilesToNewZoom(jobModalTiles, selectedModel.zoom);
+        updateJobModalDetails({ "Tiles": jobModalTiles.flat().length });
+        console.log(startobmodaldetails, "Going from", startjobmodalzoom, "to", selectedModel.zoom, "to", jobModalTiles.flat().length);
+    }
+
+    updateSelection('.S1_Model', event.currentTarget);
+    updateJobModalDetails({ "Stage 1 Model": selectedModelName, "Stage 1 Zoom": selectedModel.zoom, "Stage 2 Model": null, "Stage 2 Zoom": null });
+
+    const submodels = Object.fromEntries(selectedModel.submodels.map(m => [m.model, m]));
+    populateModels(submodels, s2models, 'S2_Model', 'fa-magnifying-glass', handleStage2Click);
+}
+
+// Handle Stage 2 model selection
+function handleStage2Click(event) {
+    const selectedModelName = event.currentTarget.innerText;
+    const parentModel = Object.values(ModalModels).flatMap(m => m.submodels).find(m => m.model === selectedModelName);
+
+    if (!parentModel) return;
+
+    updateSelection('.S2_Model', event.currentTarget);
+    updateJobModalDetails({ "Stage 2 Model": selectedModelName, "Stage 2 Zoom": parentModel.zoom });
+}
+
+// Update UI selection highlight
+function updateSelection(selector, selectedElement) {
+    document.querySelectorAll(selector).forEach(el => el.style.backgroundColor = 'Transparent');
+    selectedElement.style.backgroundColor = 'rgba(0, 75, 151, 0.41)';
+}
+
+// Initialize Stage 1 models
+populateModels(ModalModels, s1models, 'S1_Model', 'fa-robot', handleStage1Click);
+
+// when the run button is clicked
+document.getElementById('run-btn').addEventListener('click', function () {
+    console.log('Run button clicked');
+    console.log(jobModalDetails);
+    console.log(jobModalTiles.flat().length, 'tiles');
+    console.log(jobModalLocations.length, 'locations');
 });
 
 const nmm_postprocess = new NMMPostprocess(0.5, 'IOS', false);
@@ -1497,28 +1804,30 @@ async function runModelOnBoxes() {
     tfjs_worker.postMessage({ tiles: tileArrays.flat() });
     predictList = [];
 }
-function get_tiles_from_polygon(polygon) {
-    // let z = intZoom;
-    let z = toInt($('#modelZoom').val());
+function get_tiles_from_polygon(polygon, z) {
     const tile_coords = polygon.getCoordinates()[0].map(([x, y]) => meter2tile2(x, y, z));
     const geom = new Polygon([tile_coords]);
-    const [x0, y0, x1, y1] = geom.getExtent();
-
-    // Collect all tiles within the bounded polygon
+    const [xMin, yMin, xMax, yMax] = geom.getExtent().map(Math.floor);
     let tiles = [];
-    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
-        for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
-            for (let i = 0; i < 4; i++) {
-                let [mx, my] = imageCoord2Meters(0, 0, x + mod(i, 2), y + Math.floor(i / 2), z);
-                if (polygon.containsXY(mx, my)) {
-                    tiles.push({x, y, z});
-                    break;
-                }
+    // Process row by row (scan-line approach)
+    for (let y = yMin; y <= yMax; y++) {
+        let xStart = null, xEnd = null;
+        for (let x = xMin; x <= xMax; x++) {
+            let [mx, my] = imageCoord2Meters(0, 0, x + 0.5, y + 0.5, z);
+            if (polygon.containsXY(mx, my)) {
+                if (xStart === null) xStart = x; // Start of a row span
+                xEnd = x; // Keep extending
+            }
+        }
+        if (xStart !== null) {
+            for (let x = xStart; x <= xEnd; x++) {
+                tiles.push({ x, y, z });
             }
         }
     }
     return tiles;
 }
+
 async function get_tiles_from_coord_list(coord_list) {
     let tiles = [];
     coord_list.forEach(({ x, y, z }) => {

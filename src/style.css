@@ -1,6 +1,7 @@
 html, body {
     margin: 0;
     height: 100%;
+    font-family: Arial;
 }
 #map {
     position: absolute;
@@ -18,7 +19,6 @@ html, body {
 }
 
 #panel {
-    font-family: Arial, Helvetica, sans-serif;
     font-size: 12pt;
 
     background-color: var(--ol-partial-background-color);
@@ -210,28 +210,29 @@ html, body {
     bottom: 0.5em;
 }
 
-
 /* The Modal (background) */
 .modal {
     display: none;
     position: fixed;
     z-index: 1050;
-    left: 0;
     width: 100%;
     height: 100%;
     overflow: auto;
     background-color: rgba(0,0,0,0.5);
+    justify-content: center;
 }
 
 /* Modal Content/Box */
 .modal-content {
-    position: relative;
-    background-color: #fff;
-    margin: 10% auto;
-    width: 75vw;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     border-radius: 6px;
     box-shadow: 0 0 15px rgba(0,0,0,0.3);
     animation: animatetop 0.4s;
+    width: 75vw;
+    min-height: 70vh;
 }
 
 /* The Close Button */
@@ -266,6 +267,7 @@ html, body {
 /* Modal Body */
 .modal-body {
     padding: 10px 16px;
+    background-color: aliceblue;
 }
 
 /* Modal Footer */
@@ -276,16 +278,9 @@ html, body {
     border-bottom-right-radius: 6px;
 }
 #map-modal {
-    height: 40vh;
     padding: 10px 0;
+    width: 100%;
 }
-
-/* Add Animation */
-@keyframes animatetop {
-    from { top: -50px; opacity: 0; }
-    to { top: 0; opacity: 1; }
-}
-
 
 .close-info {
     color: #000;
@@ -329,4 +324,71 @@ html, body {
 .ol-layerswitcher-image>button:before,
 .ol-layerswitcher>button:after {
     height: 0;
+}
+
+#job-details{
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+
+.side-panels {
+    border-radius: 6px;
+    padding: 10px 5px;
+    top: 50px;
+    right: 20px;
+    display: flex;
+    width: 25vw;
+    flex-direction: column;
+    gap: 10px;
+}
+.stage-panel {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  margin-bottom: 5px;
+  background-color: #fff;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+#loader {
+  border: 12px solid #6c6c6c;
+  border-radius: 50%;
+  border-top: 12px solid #f3f3f3;
+  width: 70px;
+  height: 70px;
+  animation: spin 1s linear infinite;
+}
+
+.S1_Model:hover, .S2_Model:hover {
+    background-color: #f0f0f0;
+    cursor: pointer;
+}
+
+.S1_Model:active, .S2_Model:active {
+    background-color: #d0d0d0;
+}
+
+.center {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: auto;
+}
+
+.run-btn{
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 6px;
+}
+.run-btn:hover {
+    background-color: #45a049;
 }
