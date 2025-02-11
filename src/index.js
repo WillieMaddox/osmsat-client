@@ -323,7 +323,7 @@ let sourceGoogleRoads = new GoogleSource('r');
 let sourceGoogleLabels = new GoogleSource('h');
 let sourceBingAerial = new BingSource('Aerial');
 let sourceBingRoads = new BingSource('Road');
-let sourceMapbox = new MapboxSource()
+let sourceMapbox = new MapboxSource();
 
 sourceGoogleSatellite.tileToURL = {}
 sourceBingAerial.tileToURL = {}
@@ -1524,6 +1524,16 @@ function get_tiles_from_polygon(polygon) {
     }
     return tiles;
 }
+function get_bing_tiles_from_coord_list(coord_list) {
+    let tiles = [];
+    coord_list.forEach(({ x, y, z }) => {
+        const imagetile = swipe.leftBaseLayer.getSource().getTile(z, x, y);
+        const src = imagetile.src_;
+        imagetile.getImage().src = src;
+        tiles.push({ x, y, z, url: src })
+    });
+    return tiles;
+}
 async function get_tiles_from_coord_list(coord_list) {
     let tiles = [];
     coord_list.forEach(({ x, y, z }) => {
@@ -1535,7 +1545,12 @@ async function get_tiles_from_coord_list(coord_list) {
     return Promise.all(tiles);
 }
 async function runModelOnCoords() {
-    let tileArrays = await Promise.all(predictList.map(get_tiles_from_coord_list));
+    let tileArrays
+    if (swipe.leftBaseLayer.get('title') === 'Bing') {
+        tileArrays = predictList.map(get_bing_tiles_from_coord_list);
+    } else {
+        tileArrays = await Promise.all(predictList.map(get_tiles_from_coord_list));
+    }
     tfjs_worker.postMessage({ tiles: tileArrays.flat() });
     predictList = [];
 }
